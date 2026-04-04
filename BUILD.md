@@ -45,7 +45,7 @@ pyinstaller --noconfirm --onefile --windowed ^
     --name "PrivateCrossVPN" ^
     --add-data "path\to\customtkinter;customtkinter" ^
     --add-data "img;img" ^
-    --icon "img\private_cross_vpn.ico" ^
+    --icon "img\logo.ico" ^
     privatecrossvpn.py
 
 # Find the customtkinter path with:
@@ -56,7 +56,7 @@ pyinstaller --noconfirm --onefile --windowed ^
 #     --name "PrivateCrossVPN" ^
 #     --add-data "C:\Python311\Lib\site-packages\customtkinter;customtkinter" ^
 #     --add-data "img;img" ^
-#     --icon "img\private_cross_vpn.ico" ^
+#     --icon "img\logo.ico" ^
 #     privatecrossvpn.py
 ```
 
@@ -79,7 +79,7 @@ python3 -m nuitka \
     --enable-plugin=tk-inter \
     --include-package=customtkinter \
     --include-data-dir=img=img \
-    --linux-icon=img/private_cross_vpn_raw.png \
+    --linux-icon=img/logo_raw.png \
     --output-filename=PrivateCrossVPN \
     privatecrossvpn.py
 

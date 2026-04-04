@@ -77,8 +77,8 @@ def _resolve_asset_path(relative: str) -> Path:
         base = Path(__file__).resolve().parent
     return base / relative
 
-ICON_PNG = _resolve_asset_path("img/private_cross_vpn_raw.png")
-ICON_ICO = _resolve_asset_path("img/private_cross_vpn.ico")
+ICON_PNG = _resolve_asset_path("img/logo_raw.png")
+ICON_ICO = _resolve_asset_path("img/logo.ico")
 
 
 # ---------------------------------------------------------------------------
