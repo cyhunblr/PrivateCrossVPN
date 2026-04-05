@@ -11,6 +11,8 @@
 
 PrivateCrossVPN provides a unified GUI to manage WireGuard, OpenVPN, and SSH SOCKS5 tunnels — with a built-in config editor, kill-switch, auto-reconnect, and real-time IP monitoring. No third-party VPN wrappers; it talks directly to system-installed binaries.
 
+Releases are now created automatically from `main`. Each successful push bumps the patch version, builds Windows and Ubuntu 20.04 executables, tags the release, and publishes it on GitHub.
+
 ---
 
 ## Features

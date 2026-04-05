@@ -25,6 +25,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      - name: Lint Markdown
+        run: |
+          npx -y markdownlint-cli "*.md" "docs/*.md" --config .markdownlint.json
+
       - name: Lint
         run: |
           python -m ruff check .
