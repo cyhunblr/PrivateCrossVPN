@@ -1166,6 +1166,7 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         # Core modules
         self.system = SystemHandler()
+        self._repair_app_dir_permissions_if_needed()
         self.settings = AppSettings()
         self.profile_mgr = ProfileManager(self.settings)
         self.security = SecurityGuard(self.system)
@@ -3208,11 +3209,36 @@ class PrivateCrossVPNApp(ctk.CTk):
             logger.info("Privileged operations will request authentication at runtime (pkexec/sudo).")
 
     def _repair_app_dir_permissions_if_needed(self) -> None:
-        """Repair root-owned app directory created by previous elevated runs."""
+        """Repair root-owned app data created by previous elevated runs."""
         try:
             app_dir = APP_DIR
             app_dir.mkdir(parents=True, exist_ok=True)
-            if os.access(app_dir, os.W_OK):
+
+            configs_dir = app_dir / "configs"
+            configs_dir.mkdir(parents=True, exist_ok=True)
+
+            def _needs_write_fix(path: Path) -> bool:
+                if path.exists():
+                    if path.is_dir():
+                        return not os.access(path, os.W_OK | os.X_OK)
+                    return not os.access(path, os.W_OK)
+                parent = path.parent
+                return not os.access(parent, os.W_OK | os.X_OK)
+
+            needs_fix = False
+            for critical in (app_dir, configs_dir, SETTINGS_FILE):
+                if _needs_write_fix(critical):
+                    needs_fix = True
+                    break
+
+            if not needs_fix:
+                # Catch stale root-owned files inside configs/settings trees.
+                for p in app_dir.rglob("*"):
+                    if p.exists() and not os.access(p, os.W_OK):
+                        needs_fix = True
+                        break
+
+            if not needs_fix:
                 return
 
             uid = os.getuid()
