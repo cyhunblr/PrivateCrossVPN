@@ -191,6 +191,14 @@ CI/CD note: CI runs on your self-hosted Linux x64 runner. Release builds publish
 - `PrivateCrossVPN-linux-ubuntu-22.04`
 - `PrivateCrossVPN-linux-ubuntu-24.04`
 - `PrivateCrossVPN-windows-latest.exe`
+- `PrivateCrossVPN-android-release.apk`
+
+### Mobile Status and Roadmap
+
+- iOS development is paused for now; current iOS work can stay as-is, with no active feature development.
+- Android is the only mobile platform currently supported.
+- Official Android app-store release is planned as a future feature-development phase.
+- For now, Android APK build/distribution is supported via GitHub Release artifacts.
 
 ### Python
 

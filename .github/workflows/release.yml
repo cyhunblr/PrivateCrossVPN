@@ -274,8 +274,47 @@ jobs:
           name: ${{ matrix.artifact_id }}
           path: release-assets/${{ matrix.artifact_name }}
 
+  build-android:
+    needs: version
+    if: needs.version.outputs.release_allowed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      PVCVPN_VERSION: ${{ needs.version.outputs.version }}
+      ARTIFACT_NAME: PrivateCrossVPN-android-release.apk
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.0"
+          channel: stable
+
+      - name: Build Android APK
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter build apk --release
+          mkdir -p ../release-assets
+          cp build/app/outputs/flutter-apk/app-release.apk ../release-assets/${ARTIFACT_NAME}
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-release
+          path: release-assets/PrivateCrossVPN-android-release.apk
+
   publish-release:
-    needs: [version, build-windows, build-linux-self-hosted-20, build-linux-github-hosted]
+    needs: [version, build-windows, build-linux-self-hosted-20, build-linux-github-hosted, build-android]
     if: needs.version.outputs.release_allowed == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -318,6 +357,12 @@ jobs:
           name: linux-binary-ubuntu-24.04
           path: release-assets
 
+      - name: Download Android APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk-release
+          path: release-assets
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -333,6 +378,7 @@ jobs:
             | Linux x64 | `self-hosted` labels: `self-hosted,linux,x64,ubuntu-20.04` | `PrivateCrossVPN-linux-ubuntu-20.04` |
             | Linux x64 | `ubuntu-22.04` (GitHub-hosted) | `PrivateCrossVPN-linux-ubuntu-22.04` |
             | Linux x64 | `ubuntu-24.04` (GitHub-hosted) | `PrivateCrossVPN-linux-ubuntu-24.04` |
+            | Android | `ubuntu-latest` (GitHub-hosted) | `PrivateCrossVPN-android-release.apk` |
 
             Commit: `${{ github.event.workflow_run.head_sha || github.sha }}`
           files: |
@@ -340,3 +386,4 @@ jobs:
             release-assets/PrivateCrossVPN-linux-ubuntu-20.04
             release-assets/PrivateCrossVPN-linux-ubuntu-22.04
             release-assets/PrivateCrossVPN-linux-ubuntu-24.04
+            release-assets/PrivateCrossVPN-android-release.apk
