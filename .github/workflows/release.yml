@@ -73,9 +73,20 @@ jobs:
   build-windows:
     needs: version
     if: needs.version.outputs.release_allowed == 'true'
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            artifact_id: windows-binary-windows-2022
+            artifact_name: PrivateCrossVPN-windows-2022.exe
+          - runner: windows-latest
+            artifact_id: windows-binary-windows-latest
+            artifact_name: PrivateCrossVPN-windows-latest.exe
+    runs-on: ${{ matrix.runner }}
     env:
       PVCVPN_VERSION: ${{ needs.version.outputs.version }}
+      ARTIFACT_NAME: ${{ matrix.artifact_name }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -97,26 +108,81 @@ jobs:
         run: |
           $ctkPath = python -c "import customtkinter, pathlib; print(pathlib.Path(customtkinter.__path__[0]))"
           python -m PyInstaller --noconfirm --onefile --windowed `
-            --name "PrivateCrossVPN-$env:PVCVPN_VERSION-windows" `
+            --name "PrivateCrossVPN-$env:PVCVPN_VERSION-${{ matrix.runner }}" `
             --add-data "$ctkPath;customtkinter" `
             --add-data "img;img" `
             --icon "img\logo.ico" `
             privatecrossvpn.py
           New-Item -ItemType Directory -Force release-assets | Out-Null
-          Copy-Item "dist\PrivateCrossVPN-$env:PVCVPN_VERSION-windows.exe" "release-assets\PrivateCrossVPN-windows.exe"
+          Copy-Item "dist\PrivateCrossVPN-$env:PVCVPN_VERSION-${{ matrix.runner }}.exe" "release-assets\$env:ARTIFACT_NAME"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-binary
-          path: release-assets/PrivateCrossVPN-windows.exe
+          name: ${{ matrix.artifact_id }}
+          path: release-assets/${{ matrix.artifact_name }}
 
-  build-linux:
+  build-linux-self-hosted-20:
     needs: version
     if: needs.version.outputs.release_allowed == 'true'
-    runs-on: ubuntu-latest
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - ubuntu-20.04
     env:
       PVCVPN_VERSION: ${{ needs.version.outputs.version }}
+      ARTIFACT_NAME: PrivateCrossVPN-linux-ubuntu-20.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Build Linux binary (self-hosted ubuntu-20.04)
+        run: |
+          ctk_path=$(python -c "import customtkinter, pathlib; print(pathlib.Path(customtkinter.__path__[0]))")
+          python -m PyInstaller --noconfirm --onefile --windowed \
+            --name "PrivateCrossVPN-${PVCVPN_VERSION}-linux-ubuntu-20.04" \
+            --add-data "${ctk_path}:customtkinter" \
+            --add-data "img:img" \
+            privatecrossvpn.py
+          mkdir -p release-assets
+          cp "dist/PrivateCrossVPN-${PVCVPN_VERSION}-linux-ubuntu-20.04" "release-assets/${ARTIFACT_NAME}"
+
+      - name: Upload Linux artifact (self-hosted ubuntu-20.04)
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary-ubuntu-20.04-self-hosted
+          path: release-assets/PrivateCrossVPN-linux-ubuntu-20.04
+
+  build-linux-github-hosted:
+    needs: version
+    if: needs.version.outputs.release_allowed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            artifact_id: linux-binary-ubuntu-22.04
+            artifact_name: PrivateCrossVPN-linux-ubuntu-22.04
+          - runner: ubuntu-24.04
+            artifact_id: linux-binary-ubuntu-24.04
+            artifact_name: PrivateCrossVPN-linux-ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
+    env:
+      PVCVPN_VERSION: ${{ needs.version.outputs.version }}
+      ARTIFACT_NAME: ${{ matrix.artifact_name }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -137,21 +203,21 @@ jobs:
         run: |
           ctk_path=$(python -c "import customtkinter, pathlib; print(pathlib.Path(customtkinter.__path__[0]))")
           python -m PyInstaller --noconfirm --onefile --windowed \
-            --name "PrivateCrossVPN-${PVCVPN_VERSION}-linux" \
+            --name "PrivateCrossVPN-${PVCVPN_VERSION}-${{ matrix.runner }}" \
             --add-data "${ctk_path}:customtkinter" \
             --add-data "img:img" \
             privatecrossvpn.py
           mkdir -p release-assets
-          cp "dist/PrivateCrossVPN-${PVCVPN_VERSION}-linux" release-assets/PrivateCrossVPN-linux
+          cp "dist/PrivateCrossVPN-${PVCVPN_VERSION}-${{ matrix.runner }}" "release-assets/${ARTIFACT_NAME}"
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-binary
-          path: release-assets/PrivateCrossVPN-linux
+          name: ${{ matrix.artifact_id }}
+          path: release-assets/${{ matrix.artifact_name }}
 
   publish-release:
-    needs: [version, build-windows, build-linux]
+    needs: [version, build-windows, build-linux-self-hosted-20, build-linux-github-hosted]
     if: needs.version.outputs.release_allowed == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -170,16 +236,34 @@ jobs:
           git tag -a "${{ needs.version.outputs.tag }}" -m "Release ${{ needs.version.outputs.tag }}"
           git push origin "${{ needs.version.outputs.tag }}"
 
-      - name: Download Windows artifact
+      - name: Download Windows 2022 artifact
         uses: actions/download-artifact@v4
         with:
-          name: windows-binary
+          name: windows-binary-windows-2022
           path: release-assets
 
-      - name: Download Linux artifact
+      - name: Download Windows latest artifact
         uses: actions/download-artifact@v4
         with:
-          name: linux-binary
+          name: windows-binary-windows-latest
+          path: release-assets
+
+      - name: Download Linux 20.04 self-hosted artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary-ubuntu-20.04-self-hosted
+          path: release-assets
+
+      - name: Download Linux 22.04 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary-ubuntu-22.04
+          path: release-assets
+
+      - name: Download Linux 24.04 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-binary-ubuntu-24.04
           path: release-assets
 
       - name: Publish GitHub Release
@@ -187,6 +271,22 @@ jobs:
         with:
           tag_name: ${{ needs.version.outputs.tag }}
           name: ${{ needs.version.outputs.tag }}
+          body: |
+            Automated release from `main` after successful CI.
+
+            ## Build Matrix
+            | Target | Runner | Artifact |
+            |---|---|---|
+            | Windows x64 | `windows-2022` (GitHub-hosted) | `PrivateCrossVPN-windows-2022.exe` |
+            | Windows x64 | `windows-latest` (GitHub-hosted) | `PrivateCrossVPN-windows-latest.exe` |
+            | Linux x64 | `self-hosted` labels: `self-hosted,linux,x64,ubuntu-20.04` | `PrivateCrossVPN-linux-ubuntu-20.04` |
+            | Linux x64 | `ubuntu-22.04` (GitHub-hosted) | `PrivateCrossVPN-linux-ubuntu-22.04` |
+            | Linux x64 | `ubuntu-24.04` (GitHub-hosted) | `PrivateCrossVPN-linux-ubuntu-24.04` |
+
+            Commit: `${{ github.event.workflow_run.head_sha || github.sha }}`
           files: |
-            release-assets/PrivateCrossVPN-windows.exe
-            release-assets/PrivateCrossVPN-linux
+            release-assets/PrivateCrossVPN-windows-2022.exe
+            release-assets/PrivateCrossVPN-windows-latest.exe
+            release-assets/PrivateCrossVPN-linux-ubuntu-20.04
+            release-assets/PrivateCrossVPN-linux-ubuntu-22.04
+            release-assets/PrivateCrossVPN-linux-ubuntu-24.04

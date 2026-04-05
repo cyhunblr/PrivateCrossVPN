@@ -1,17 +1,17 @@
-<p align="center">
+<p align="center" style="margin-bottom: 0;">
   <img src="img/logo.png" alt="PrivateCrossVPN" width="400">
 </p>
 
-<p align="center">
+<p align="center" style="margin-top: 6px;">
+  <span style="font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">PrivateCrossVPN</span><br>
   <strong>A production-grade, cross-platform VPN management application</strong><br>
-  Windows 11 &bull; Ubuntu 20.04 &bull; Python 3.10+ &bull; CustomTkinter
 </p>
 
 ---
 
 PrivateCrossVPN provides a unified GUI to manage WireGuard, OpenVPN, and SSH SOCKS5 tunnels — with a built-in config editor, kill-switch, auto-reconnect, and real-time IP monitoring. No third-party VPN wrappers; it talks directly to system-installed binaries.
 
-Releases are now created automatically from `main`. Each successful push bumps the patch version, builds Windows and Ubuntu 20.04 executables, tags the release, and publishes it on GitHub.
+Releases are now created automatically from `main`. Each successful push bumps the patch version, builds Windows and Linux executables, tags the release, and publishes it on GitHub.
 
 ---
 
@@ -28,7 +28,7 @@ Releases are now created automatically from `main`. Each successful push bumps t
 | **Profile Manager** | Save, load, switch, and delete profiles. Last-used profile is remembered across sessions |
 | **IP Monitor** | Real-time public IP, location, ISP, and timezone via ipinfo.io |
 | **Configurable Storage** | Default config directory: `~/.privatecrossvpn/configs/` — changeable from the UI |
-| **Cross-Platform** | Single codebase for Windows 11 and Ubuntu 20.04 |
+| **Cross-Platform** | Single codebase for Windows 11 and Linux |
 
 ---
 
@@ -116,9 +116,10 @@ chmod +x .githooks/commit-msg
 
 ### Platform
 
-- **Linux**: Ubuntu 20.04 / 22.04 (or any Debian-based distro)
-- **Linux**: Ubuntu 20.04
-- **Windows**: Windows 11 (Windows 10 should also work)
+- **Linux**: x64 distro with compatible glibc for the selected release artifact (`ubuntu-20.04`, `ubuntu-22.04`, or `ubuntu-24.04` build)
+- **Windows**: choose the closest GitHub-hosted build artifact (`windows-2022` or `windows-latest`)
+
+CI/CD note: Release builds publish a matrix of Linux and Windows artifacts. Linux includes one self-hosted `ubuntu-20.04` build plus GitHub-hosted `ubuntu-22.04` and `ubuntu-24.04` builds. Windows artifacts are built on GitHub-hosted Windows Server runners (`windows-2022` and `windows-latest`), not desktop Win10/Win11 hosts.
 
 ### Python
 
