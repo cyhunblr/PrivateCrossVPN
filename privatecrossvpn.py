@@ -967,6 +967,10 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._tunnel_state = TunnelState.DISCONNECTED
         self._ip_info = IPInfo()
         self._kill_switch_var = ctk.BooleanVar(value=False)
+
+        # Wizard state
+        self._wizard_ssh_key_path: Optional[Path] = None
+        self._wizard_ssh_pubkey: str = ""
         self._connect_start_time = 0.0
 
         # Window
@@ -1245,8 +1249,521 @@ class PrivateCrossVPNApp(ctk.CTk):
         ssh_btn_frame.grid(row=6, column=0, columnspan=2, pady=(6, 4))
         ctk.CTkButton(ssh_btn_frame, text="Save Profile", command=self._save_ssh_profile).pack(side="left", padx=4)
 
+        # --- Setup Wizard tab ---
+        self._build_setup_wizard()
+
         # Sync the tab to the protocol selector
         self._on_protocol_change(self._protocol_var.get())
+
+    def _build_setup_wizard(self) -> None:
+        """Build the guided Setup wizard tab inside the editor tabview."""
+        setup = self._editor_tabview.add("Setup")
+        scroll = ctk.CTkScrollableFrame(setup)
+        scroll.pack(fill="both", expand=True)
+        scroll.grid_columnconfigure(0, weight=1)
+
+        row = 0
+
+        # ── Step 1: SSH Key ──────────────────────────────────────────────
+        row = self._wizard_build_header(scroll, "Step 1: SSH Key", row)
+
+        self._wiz_ssh_status = ctk.CTkLabel(scroll, text="Checking…", anchor="w")
+        self._wiz_ssh_status.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="w"); row += 1
+
+        self._wiz_ssh_pubkey_box = ctk.CTkTextbox(scroll, height=50, state="disabled")
+        self._wiz_ssh_pubkey_box.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="ew"); row += 1
+
+        ssh_btn_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        ssh_btn_row.grid(row=row, column=0, padx=8, pady=(2, 6), sticky="w"); row += 1
+
+        self._wiz_ssh_gen_btn = ctk.CTkButton(
+            ssh_btn_row, text="Generate SSH Key", width=150, command=self._wizard_generate_ssh_key)
+        self._wiz_ssh_gen_btn.pack(side="left", padx=(0, 8))
+
+        self._wiz_ssh_copy_btn = ctk.CTkButton(
+            ssh_btn_row, text="Copy Public Key", width=130,
+            command=lambda: self._wizard_copy_to_clipboard(self._wizard_ssh_pubkey))
+        self._wiz_ssh_copy_btn.pack(side="left")
+
+        # Check for existing key on startup
+        self.after(300, self._wizard_check_ssh_key)
+
+        # ── Step 2: Server Info ──────────────────────────────────────────
+        row = self._wizard_build_header(scroll, "Step 2: Server Info", row)
+
+        self._wiz_provider_var = ctk.StringVar(value="DigitalOcean")
+        provider_seg = ctk.CTkSegmentedButton(
+            scroll, values=["DigitalOcean", "Azure", "Other"],
+            variable=self._wiz_provider_var, command=self._wizard_on_provider_change)
+        provider_seg.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+
+        self._wiz_provider_info = ctk.CTkTextbox(scroll, height=60, state="disabled")
+        self._wiz_provider_info.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+
+        srv_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        srv_frame.grid(row=row, column=0, padx=8, pady=(2, 6), sticky="ew"); row += 1
+        srv_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(srv_frame, text="Server IP:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_server_ip = ctk.CTkEntry(srv_frame, placeholder_text="203.0.113.10")
+        self._wiz_server_ip.grid(row=0, column=1, pady=2, sticky="ew")
+
+        ctk.CTkLabel(srv_frame, text="SSH User:", anchor="w").grid(row=1, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_ssh_user = ctk.CTkEntry(srv_frame, placeholder_text="root")
+        self._wiz_ssh_user.grid(row=1, column=1, pady=2, sticky="ew")
+
+        ctk.CTkLabel(srv_frame, text="SSH Port:", anchor="w").grid(row=2, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_ssh_port = ctk.CTkEntry(srv_frame, placeholder_text="22")
+        self._wiz_ssh_port.grid(row=2, column=1, pady=2, sticky="ew")
+
+        self.after(350, lambda: self._wizard_on_provider_change("DigitalOcean"))
+
+        # ── Step 3: Connection Test ──────────────────────────────────────
+        row = self._wizard_build_header(scroll, "Step 3: Connection Test", row)
+
+        test_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        test_row.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="ew"); row += 1
+
+        self._wiz_test_btn = ctk.CTkButton(
+            test_row, text="Test SSH Connection", width=180, command=self._wizard_test_connection)
+        self._wiz_test_btn.pack(side="left", padx=(0, 12))
+
+        self._wiz_test_status = ctk.CTkLabel(test_row, text="", anchor="w")
+        self._wiz_test_status.pack(side="left", fill="x", expand=True)
+
+        self._wiz_test_detail = ctk.CTkLabel(scroll, text="", anchor="w", font=ctk.CTkFont(size=11), wraplength=600)
+        self._wiz_test_detail.grid(row=row, column=0, padx=8, pady=(0, 6), sticky="w"); row += 1
+
+        # ── Step 4: VPN Protocol & Profile ───────────────────────────────
+        row = self._wizard_build_header(scroll, "Step 4: VPN Protocol & Profile", row)
+
+        self._wiz_proto_var = ctk.StringVar(value="WireGuard")
+        proto_seg = ctk.CTkSegmentedButton(
+            scroll, values=["WireGuard", "OpenVPN", "SSH SOCKS5"],
+            variable=self._wiz_proto_var, command=self._wizard_on_proto_change)
+        proto_seg.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+
+        # Protocol-specific frames (stacked, show/hide)
+        self._wiz_proto_container = ctk.CTkFrame(scroll, fg_color="transparent")
+        self._wiz_proto_container.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+        self._wiz_proto_container.grid_columnconfigure(0, weight=1)
+
+        # -- WireGuard frame --
+        self._wiz_wg_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
+        self._wiz_wg_frame.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(self._wiz_wg_frame, text="Run these commands on your server:", anchor="w",
+                      font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w", pady=(0, 2))
+
+        wg_cmds = (
+            "sudo apt install -y wireguard\n"
+            "cd /etc/wireguard && sudo bash -c 'umask 077\n"
+            "wg genkey | tee server_private.key | wg pubkey > server_public.key\n"
+            "wg genkey | tee client_private.key | wg pubkey > client_public.key'\n"
+            "sudo cat server_public.key && echo '---' && sudo cat client_private.key"
+        )
+        self._wiz_wg_cmds_box = ctk.CTkTextbox(self._wiz_wg_frame, height=80)
+        self._wiz_wg_cmds_box.grid(row=1, column=0, sticky="ew", pady=(0, 4))
+        self._wiz_wg_cmds_box.insert("1.0", wg_cmds)
+        self._wiz_wg_cmds_box.configure(state="disabled")
+
+        ctk.CTkButton(self._wiz_wg_frame, text="Copy Commands", width=130,
+                       command=lambda: self._wizard_copy_to_clipboard(wg_cmds)).grid(
+            row=2, column=0, sticky="w", pady=(0, 6))
+
+        wg_fields = ctk.CTkFrame(self._wiz_wg_frame, fg_color="transparent")
+        wg_fields.grid(row=3, column=0, sticky="ew")
+        wg_fields.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(wg_fields, text="Server Public Key:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_wg_server_pubkey = ctk.CTkEntry(wg_fields, placeholder_text="Paste server_public.key here")
+        self._wiz_wg_server_pubkey.grid(row=0, column=1, pady=2, sticky="ew")
+
+        ctk.CTkLabel(wg_fields, text="Client Private Key:", anchor="w").grid(row=1, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_wg_client_privkey = ctk.CTkEntry(wg_fields, placeholder_text="Paste client_private.key here")
+        self._wiz_wg_client_privkey.grid(row=1, column=1, pady=2, sticky="ew")
+
+        ctk.CTkLabel(wg_fields, text="Tunnel Address:", anchor="w").grid(row=2, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_wg_address = ctk.CTkEntry(wg_fields, placeholder_text="10.0.0.2/24")
+        self._wiz_wg_address.grid(row=2, column=1, pady=2, sticky="ew")
+
+        ctk.CTkLabel(wg_fields, text="DNS:", anchor="w").grid(row=3, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_wg_dns = ctk.CTkEntry(wg_fields, placeholder_text="1.1.1.1")
+        self._wiz_wg_dns.grid(row=3, column=1, pady=2, sticky="ew")
+
+        # -- OpenVPN frame --
+        self._wiz_ovpn_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
+        self._wiz_ovpn_frame.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(self._wiz_ovpn_frame, text="Run this on your server:", anchor="w",
+                      font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w", pady=(0, 2))
+
+        ovpn_cmds = (
+            "curl -O https://raw.githubusercontent.com/angristan/openvpn-install/master/openvpn-install.sh\n"
+            "chmod +x openvpn-install.sh\n"
+            "sudo ./openvpn-install.sh"
+        )
+        self._wiz_ovpn_cmds_box = ctk.CTkTextbox(self._wiz_ovpn_frame, height=55)
+        self._wiz_ovpn_cmds_box.grid(row=1, column=0, sticky="ew", pady=(0, 4))
+        self._wiz_ovpn_cmds_box.insert("1.0", ovpn_cmds)
+        self._wiz_ovpn_cmds_box.configure(state="disabled")
+
+        ovpn_btn_row = ctk.CTkFrame(self._wiz_ovpn_frame, fg_color="transparent")
+        ovpn_btn_row.grid(row=2, column=0, sticky="w", pady=(0, 4))
+
+        ctk.CTkButton(ovpn_btn_row, text="Copy Commands", width=130,
+                       command=lambda: self._wizard_copy_to_clipboard(ovpn_cmds)).pack(side="left", padx=(0, 8))
+
+        ctk.CTkButton(ovpn_btn_row, text="Import .ovpn File", width=140,
+                       command=self._wizard_import_ovpn).pack(side="left")
+
+        self._wiz_ovpn_file_label = ctk.CTkLabel(
+            self._wiz_ovpn_frame, text="No .ovpn file imported yet", anchor="w",
+            font=ctk.CTkFont(size=11), text_color="gray")
+        self._wiz_ovpn_file_label.grid(row=3, column=0, sticky="w", pady=(0, 4))
+
+        # -- SSH SOCKS5 frame --
+        self._wiz_ssh_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
+        self._wiz_ssh_frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(self._wiz_ssh_frame, text="No server-side setup needed. Just pick a SOCKS port:", anchor="w",
+                      font=ctk.CTkFont(size=12)).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
+
+        ctk.CTkLabel(self._wiz_ssh_frame, text="SOCKS5 Port:", anchor="w").grid(row=1, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_socks_port = ctk.CTkEntry(self._wiz_ssh_frame, placeholder_text="1080")
+        self._wiz_socks_port.grid(row=1, column=1, pady=2, sticky="ew")
+
+        # ── Profile Name & Create ────────────────────────────────────────
+        sep = ctk.CTkFrame(scroll, height=2, fg_color="gray40")
+        sep.grid(row=row, column=0, padx=8, pady=(8, 4), sticky="ew"); row += 1
+
+        profile_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        profile_row.grid(row=row, column=0, padx=8, pady=(4, 8), sticky="ew"); row += 1
+        profile_row.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(profile_row, text="Profile Name:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
+        self._wiz_profile_name = ctk.CTkEntry(profile_row, placeholder_text="my-vpn-server")
+        self._wiz_profile_name.grid(row=0, column=1, pady=2, sticky="ew")
+
+        self._wiz_create_btn = ctk.CTkButton(
+            profile_row, text="Create Profile", width=140,
+            fg_color="green", hover_color="#2d8a2d",
+            command=self._wizard_create_profile)
+        self._wiz_create_btn.grid(row=0, column=2, padx=(8, 0), pady=2)
+
+        self._wiz_result_label = ctk.CTkLabel(scroll, text="", anchor="w")
+        self._wiz_result_label.grid(row=row, column=0, padx=8, pady=(0, 8), sticky="w")
+
+        # Show WireGuard by default (must be after _wiz_profile_name is created)
+        self._wizard_on_proto_change("WireGuard")
+
+    @staticmethod
+    def _wizard_build_header(parent: ctk.CTkFrame, title: str, row: int) -> int:
+        """Add a step header label and return the next row."""
+        ctk.CTkLabel(parent, text=title, font=ctk.CTkFont(size=13, weight="bold"), anchor="w").grid(
+            row=row, column=0, padx=8, pady=(10, 2), sticky="w")
+        return row + 1
+
+    # -----------------------------------------------------------------------
+    # Wizard Actions
+    # -----------------------------------------------------------------------
+
+    def _wizard_check_ssh_key(self) -> None:
+        """Check for existing SSH keys and update the UI."""
+        key_candidates = [
+            Path.home() / ".ssh" / "id_ed25519",
+            Path.home() / ".ssh" / "id_rsa",
+            Path.home() / ".ssh" / "vpn_key",
+        ]
+        for key_path in key_candidates:
+            pub_path = key_path.with_suffix(".pub") if key_path.suffix != ".pub" else key_path
+            priv_path = pub_path.with_suffix("")
+            if pub_path.exists() and priv_path.exists():
+                try:
+                    pubkey = pub_path.read_text(encoding="utf-8").strip()
+                    self._wizard_ssh_key_path = priv_path
+                    self._wizard_ssh_pubkey = pubkey
+                    self._wiz_ssh_status.configure(
+                        text=f"Key found: {priv_path}", text_color="#2ecc71")
+                    self._wiz_ssh_pubkey_box.configure(state="normal")
+                    self._wiz_ssh_pubkey_box.delete("1.0", "end")
+                    self._wiz_ssh_pubkey_box.insert("1.0", pubkey)
+                    self._wiz_ssh_pubkey_box.configure(state="disabled")
+                    self._wiz_ssh_gen_btn.configure(state="disabled", text="Key Exists")
+                    logger.info("Wizard: SSH key found at %s", priv_path)
+                    return
+                except Exception:
+                    continue
+
+        self._wiz_ssh_status.configure(
+            text="No SSH key found. Click 'Generate SSH Key' to create one.", text_color="#f39c12")
+        self._wiz_ssh_gen_btn.configure(state="normal")
+
+    def _wizard_generate_ssh_key(self) -> None:
+        """Generate a new Ed25519 SSH key pair."""
+        keygen = shutil.which("ssh-keygen")
+        if not keygen:
+            self._wiz_ssh_status.configure(
+                text="ssh-keygen not found. Install OpenSSH first.", text_color="#e74c3c")
+            return
+
+        key_path = Path.home() / ".ssh" / "vpn_key"
+        ssh_dir = key_path.parent
+        ssh_dir.mkdir(parents=True, exist_ok=True)
+
+        if key_path.exists():
+            self._wiz_ssh_status.configure(text="Key already exists at ~/.ssh/vpn_key", text_color="#f39c12")
+            self._wizard_check_ssh_key()
+            return
+
+        self._wiz_ssh_gen_btn.configure(state="disabled", text="Generating…")
+        self._wiz_ssh_status.configure(text="Generating SSH key…", text_color="gray")
+
+        def _worker() -> None:
+            try:
+                result = subprocess.run(
+                    [keygen, "-t", "ed25519", "-C", "privatecrossvpn", "-f", str(key_path), "-N", ""],
+                    shell=False, capture_output=True, text=True, timeout=30,
+                )
+                if result.returncode == 0:
+                    logger.info("Wizard: SSH key generated at %s", key_path)
+                    self.after(0, self._wizard_check_ssh_key)
+                else:
+                    err = result.stderr.strip()
+                    logger.error("ssh-keygen failed: %s", err)
+                    self.after(0, lambda: self._wiz_ssh_status.configure(
+                        text=f"Generation failed: {err}", text_color="#e74c3c"))
+                    self.after(0, lambda: self._wiz_ssh_gen_btn.configure(
+                        state="normal", text="Generate SSH Key"))
+            except Exception as exc:
+                logger.error("ssh-keygen error: %s", exc)
+                self.after(0, lambda: self._wiz_ssh_status.configure(
+                    text=f"Error: {exc}", text_color="#e74c3c"))
+                self.after(0, lambda: self._wiz_ssh_gen_btn.configure(
+                    state="normal", text="Generate SSH Key"))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _wizard_on_provider_change(self, provider: str) -> None:
+        """Update the provider instruction text."""
+        instructions = {
+            "DigitalOcean": (
+                "1. Go to cloud.digitalocean.com → Create → Droplets\n"
+                "2. Choose Ubuntu 24.04, Basic $6/mo (or cheapest)\n"
+                "3. Under Authentication, select SSH Key and add the public key from Step 1\n"
+                "4. Create Droplet and copy its IP address below"
+            ),
+            "Azure": (
+                "1. Go to portal.azure.com → Create a resource → Virtual machine\n"
+                "2. Choose Ubuntu 24.04, Size: Standard_B1s (~$7.59/mo)\n"
+                "3. Authentication: SSH public key, paste the key from Step 1\n"
+                "4. Create and copy the VM's public IP address below"
+            ),
+            "Other": (
+                "Ensure you have a Linux server (Ubuntu/Debian recommended) with:\n"
+                "- SSH access enabled\n"
+                "- Your public key from Step 1 added to ~/.ssh/authorized_keys\n"
+                "- Enter the server details below"
+            ),
+        }
+        text = instructions.get(provider, instructions["Other"])
+        self._wiz_provider_info.configure(state="normal")
+        self._wiz_provider_info.delete("1.0", "end")
+        self._wiz_provider_info.insert("1.0", text)
+        self._wiz_provider_info.configure(state="disabled")
+
+    def _wizard_test_connection(self) -> None:
+        """Test SSH connection to the server in a background thread."""
+        ip = self._wiz_server_ip.get().strip()
+        user = self._wiz_ssh_user.get().strip() or "root"
+        port = self._wiz_ssh_port.get().strip() or "22"
+
+        if not ip:
+            self._wiz_test_status.configure(text="Enter a server IP first.", text_color="#e74c3c")
+            return
+
+        if not self._wizard_ssh_key_path:
+            self._wiz_test_status.configure(text="Generate or locate an SSH key first (Step 1).", text_color="#e74c3c")
+            return
+
+        ssh_bin = shutil.which("ssh")
+        if not ssh_bin:
+            self._wiz_test_status.configure(text="ssh binary not found.", text_color="#e74c3c")
+            return
+
+        self._wiz_test_btn.configure(state="disabled", text="Testing…")
+        self._wiz_test_status.configure(text="Connecting…", text_color="#f39c12")
+        self._wiz_test_detail.configure(text="")
+
+        def _worker() -> None:
+            try:
+                result = subprocess.run(
+                    [
+                        ssh_bin,
+                        "-o", "BatchMode=yes",
+                        "-o", "ConnectTimeout=10",
+                        "-o", "StrictHostKeyChecking=accept-new",
+                        "-i", str(self._wizard_ssh_key_path),
+                        "-p", port,
+                        f"{user}@{ip}",
+                        "uname -a",
+                    ],
+                    shell=False, capture_output=True, text=True, timeout=20,
+                )
+                if result.returncode == 0:
+                    info = result.stdout.strip()
+                    self.after(0, lambda: self._wiz_test_status.configure(
+                        text="Connected successfully!", text_color="#2ecc71"))
+                    self.after(0, lambda: self._wiz_test_detail.configure(
+                        text=f"Server: {info}"))
+                    logger.info("Wizard: SSH test OK — %s", info)
+                else:
+                    err = result.stderr.strip() or "Connection failed"
+                    self.after(0, lambda: self._wiz_test_status.configure(
+                        text="Connection failed.", text_color="#e74c3c"))
+                    self.after(0, lambda: self._wiz_test_detail.configure(text=err))
+                    logger.warning("Wizard: SSH test failed — %s", err)
+            except subprocess.TimeoutExpired:
+                self.after(0, lambda: self._wiz_test_status.configure(
+                    text="Connection timed out.", text_color="#e74c3c"))
+            except Exception as exc:
+                self.after(0, lambda: self._wiz_test_status.configure(
+                    text=f"Error: {exc}", text_color="#e74c3c"))
+            finally:
+                self.after(0, lambda: self._wiz_test_btn.configure(
+                    state="normal", text="Test SSH Connection"))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _wizard_on_proto_change(self, proto: str) -> None:
+        """Show/hide protocol-specific frames."""
+        for frame in (self._wiz_wg_frame, self._wiz_ovpn_frame, self._wiz_ssh_frame):
+            frame.grid_forget()
+
+        if proto == "WireGuard":
+            self._wiz_wg_frame.grid(row=0, column=0, sticky="ew")
+        elif proto == "OpenVPN":
+            self._wiz_ovpn_frame.grid(row=0, column=0, sticky="ew")
+        elif proto == "SSH SOCKS5":
+            self._wiz_ssh_frame.grid(row=0, column=0, sticky="ew")
+
+        # Auto-fill profile name
+        provider = self._wiz_provider_var.get().lower().replace(" ", "").replace("/", "")
+        proto_short = proto.lower().replace(" ", "-")
+        suggested = f"{provider}-{proto_short}"
+        self._wiz_profile_name.delete(0, "end")
+        self._wiz_profile_name.insert(0, suggested)
+
+    def _wizard_import_ovpn(self) -> None:
+        """Import an .ovpn file for the OpenVPN wizard path."""
+        path = filedialog.askopenfilename(
+            title="Import .ovpn Configuration",
+            filetypes=[("OpenVPN Config", "*.ovpn"), ("All Files", "*.*")])
+        if path:
+            self._wiz_ovpn_import_path = Path(path)
+            self._wiz_ovpn_file_label.configure(text=f"Imported: {Path(path).name}", text_color="#2ecc71")
+            logger.info("Wizard: Imported .ovpn file: %s", path)
+
+    def _wizard_create_profile(self) -> None:
+        """Assemble wizard data into a profile and save it."""
+        name = self._wiz_profile_name.get().strip()
+        if not name:
+            self._wiz_result_label.configure(text="Enter a profile name.", text_color="#e74c3c")
+            return
+
+        proto = self._wiz_proto_var.get()
+        ip = self._wiz_server_ip.get().strip()
+        user = self._wiz_ssh_user.get().strip() or "root"
+        port = self._wiz_ssh_port.get().strip() or "22"
+
+        if proto == "WireGuard":
+            server_pubkey = self._wiz_wg_server_pubkey.get().strip()
+            client_privkey = self._wiz_wg_client_privkey.get().strip()
+            address = self._wiz_wg_address.get().strip() or "10.0.0.2/24"
+            dns = self._wiz_wg_dns.get().strip() or "1.1.1.1"
+
+            if not server_pubkey or not client_privkey:
+                self._wiz_result_label.configure(
+                    text="Server public key and client private key are required.", text_color="#e74c3c")
+                return
+
+            endpoint = f"{ip}:51820" if ip else ""
+            data = {
+                "protocol": Protocol.WIREGUARD.value,
+                "name": name,
+                "wg_private_key": client_privkey,
+                "wg_address": address,
+                "wg_dns": dns,
+                "wg_public_key": server_pubkey,
+                "wg_endpoint": endpoint,
+                "wg_allowed_ips": "0.0.0.0/0, ::/0",
+                "wg_keepalive": "25",
+            }
+            conf_path = self.profile_mgr.generate_wireguard_conf(name, data)
+            data["config_file"] = str(conf_path)
+
+        elif proto == "OpenVPN":
+            ovpn_path = getattr(self, "_wiz_ovpn_import_path", None)
+            if not ovpn_path or not ovpn_path.exists():
+                self._wiz_result_label.configure(
+                    text="Import an .ovpn file first.", text_color="#e74c3c")
+                return
+            # Copy to configs dir
+            dest = self.settings.configs_dir / ovpn_path.name
+            shutil.copy2(ovpn_path, dest)
+            data = {
+                "protocol": Protocol.OPENVPN.value,
+                "name": name,
+                "config_file": str(dest),
+            }
+
+        elif proto == "SSH SOCKS5":
+            if not ip:
+                self._wiz_result_label.configure(
+                    text="Enter the server IP in Step 2.", text_color="#e74c3c")
+                return
+            socks = self._wiz_socks_port.get().strip() or "1080"
+            data = {
+                "protocol": Protocol.SSH_SOCKS5.value,
+                "name": name,
+                "ssh_host": ip,
+                "ssh_port": port,
+                "ssh_user": user,
+                "socks_port": socks,
+                "ssh_key_path": str(self._wizard_ssh_key_path) if self._wizard_ssh_key_path else "",
+            }
+        else:
+            return
+
+        # Save profile
+        self.profile_mgr.save_profile(name, data)
+        self.settings.last_profile = name
+        self._load_profile_list()
+        self._profile_var.set(name)
+        self._on_profile_select(name)
+
+        # Switch to the protocol tab
+        proto_tab_map = {
+            "WireGuard": Protocol.WIREGUARD.value,
+            "OpenVPN": Protocol.OPENVPN.value,
+            "SSH SOCKS5": Protocol.SSH_SOCKS5.value,
+        }
+        proto_val = proto_tab_map.get(proto, Protocol.WIREGUARD.value)
+        self._protocol_var.set(proto_val)
+        self._on_protocol_change(proto_val)
+
+        self._wiz_result_label.configure(
+            text=f"Profile '{name}' created! Switch to the sidebar and click Connect.",
+            text_color="#2ecc71")
+        logger.info("Wizard: Profile '%s' created (%s).", name, proto)
+
+    def _wizard_copy_to_clipboard(self, text: str) -> None:
+        """Copy text to the system clipboard."""
+        if not text:
+            return
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        logger.info("Wizard: Copied to clipboard.")
 
     def _build_log_area(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")

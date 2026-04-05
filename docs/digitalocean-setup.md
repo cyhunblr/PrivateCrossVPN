@@ -33,16 +33,62 @@ Set up your own WireGuard or OpenVPN server on a DigitalOcean Droplet, then conn
 4. Click **Create Droplet**
 5. Note the **public IPv4 address** (e.g., `164.90.xxx.xxx`)
 
-### Add your SSH key (if you haven't)
+### SSH Key Setup (before creating the Droplet)
+
+You need an SSH key pair to securely access your server. The **private key** stays on your local machine, the **public key** goes to DigitalOcean.
+
+#### Step 1: Check if you already have a key
 
 ```bash
-# Generate a key pair (if you don't have one)
-ssh-keygen -t ed25519 -C "vpn-key" -f ~/.ssh/vpn_key
-
-# Copy the public key
-cat ~/.ssh/vpn_key.pub
-# Paste this into DigitalOcean -> Settings -> Security -> SSH Keys -> Add SSH Key
+ls ~/.ssh/id_ed25519.pub 2>/dev/null || ls ~/.ssh/id_rsa.pub 2>/dev/null
 ```
+
+If a file is listed, you already have a key — skip to Step 3.
+
+#### Step 2: Generate a new key pair
+
+**Linux / macOS** — open a terminal:
+
+```bash
+ssh-keygen -t ed25519 -C "vpn-key" -f ~/.ssh/vpn_key
+```
+
+- Press Enter when asked for a passphrase (or set one for extra security)
+- This creates two files:
+  - `~/.ssh/vpn_key` — private key (keep this secret, never share)
+  - `~/.ssh/vpn_key.pub` — public key (this goes to DigitalOcean)
+
+**Windows 11** — open PowerShell or Windows Terminal:
+
+```powershell
+ssh-keygen -t ed25519 -C "vpn-key" -f $env:USERPROFILE\.ssh\vpn_key
+```
+
+- Same two files are created under `C:\Users\YourName\.ssh\`
+
+#### Step 3: Copy the public key
+
+```bash
+# Linux / macOS
+cat ~/.ssh/vpn_key.pub
+```
+
+```powershell
+# Windows PowerShell
+Get-Content $env:USERPROFILE\.ssh\vpn_key.pub
+```
+
+Copy the entire output (starts with `ssh-ed25519 ...`).
+
+#### Step 4: Add the key to DigitalOcean
+
+1. Go to [cloud.digitalocean.com/account/security](https://cloud.digitalocean.com/account/security)
+2. Scroll to **SSH Keys** → click **Add SSH Key**
+3. Paste the public key content into the box
+4. Give it a name (e.g., `my-laptop`)
+5. Click **Add SSH Key**
+
+Now when creating a Droplet, select this key under **Authentication → SSH Key**.
 
 ---
 
