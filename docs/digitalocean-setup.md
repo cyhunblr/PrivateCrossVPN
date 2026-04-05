@@ -37,48 +37,61 @@ Set up your own WireGuard or OpenVPN server on a DigitalOcean Droplet, then conn
 
 You need an SSH key pair to securely access your server. The **private key** stays on your local machine, the **public key** goes to DigitalOcean.
 
-#### Step 1: Check if you already have a key
+#### Option A: Use an existing key
+
+Check if you already have a key:
 
 ```bash
-ls ~/.ssh/id_ed25519.pub 2>/dev/null || ls ~/.ssh/id_rsa.pub 2>/dev/null
+ls ~/.ssh/*.pub
 ```
 
-If a file is listed, you already have a key — skip to Step 3.
-
-#### Step 2: Generate a new key pair
-
-**Linux / macOS** — open a terminal:
+Common key files: `id_ed25519`, `id_rsa`, `id_ecdsa`. If any `.pub` file is listed, you already have a key. Print it:
 
 ```bash
-ssh-keygen -t ed25519 -C "vpn-key" -f ~/.ssh/vpn_key
+# Replace with your actual key name
+cat ~/.ssh/id_rsa.pub
+```
+
+Skip to Step 3 below.
+
+> **Tip**: PrivateCrossVPN's **Setup** wizard (in the app) auto-detects existing keys. You can also browse for any key file via "Use Existing Key".
+
+#### Option B: Generate a new key
+
+Choose any name you like (examples: `id_ed25519`, `do_vpn`, `myserver`):
+
+**Linux / macOS:**
+
+```bash
+ssh-keygen -t ed25519 -C "my-vpn" -f ~/.ssh/id_ed25519
+```
+
+**Windows 11 (PowerShell):**
+
+```powershell
+ssh-keygen -t ed25519 -C "my-vpn" -f $env:USERPROFILE\.ssh\id_ed25519
 ```
 
 - Press Enter when asked for a passphrase (or set one for extra security)
-- This creates two files:
-  - `~/.ssh/vpn_key` — private key (keep this secret, never share)
-  - `~/.ssh/vpn_key.pub` — public key (this goes to DigitalOcean)
+- Two files are created:
+  - `~/.ssh/id_ed25519` — private key (keep secret, never share)
+  - `~/.ssh/id_ed25519.pub` — public key (this goes to DigitalOcean)
 
-**Windows 11** — open PowerShell or Windows Terminal:
-
-```powershell
-ssh-keygen -t ed25519 -C "vpn-key" -f $env:USERPROFILE\.ssh\vpn_key
-```
-
-- Same two files are created under `C:\Users\YourName\.ssh\`
+> **Note**: You can use any filename, not just `id_ed25519`. Just remember the name — you'll need to point PrivateCrossVPN to the private key file.
 
 #### Step 3: Copy the public key
 
 ```bash
-# Linux / macOS
-cat ~/.ssh/vpn_key.pub
+# Replace with your key name
+cat ~/.ssh/id_ed25519.pub
 ```
 
 ```powershell
-# Windows PowerShell
-Get-Content $env:USERPROFILE\.ssh\vpn_key.pub
+# Windows
+Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub
 ```
 
-Copy the entire output (starts with `ssh-ed25519 ...`).
+Copy the entire output (starts with `ssh-ed25519 ...` or `ssh-rsa ...`).
 
 #### Step 4: Add the key to DigitalOcean
 

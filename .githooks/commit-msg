@@ -1,0 +1,24 @@
+#!/bin/sh
+
+commit_msg_file="$1"
+commit_msg=$(head -n 1 "$commit_msg_file")
+
+pattern='^(feat|fix|refactor|chore|docs|test|build|ci|perf|style)(\([a-z0-9._-]+\))?: .+'
+
+if printf '%s' "$commit_msg" | grep -Eq "$pattern"; then
+  exit 0
+fi
+
+cat <<'EOF'
+Invalid commit message format.
+
+Use Conventional Commits, for example:
+  feat: add GitHub Actions release workflow
+  fix: handle missing SSH key path
+  refactor: split tunnel connection logic
+  chore: update CI dependencies
+
+Allowed types: feat, fix, refactor, chore, docs, test, build, ci, perf, style
+EOF
+
+exit 1

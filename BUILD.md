@@ -112,3 +112,11 @@ sudo ./dist/PrivateCrossVPN
 3. **SSH SOCKS5**: Select SSH SOCKS5, fill in host/user/port, optionally import a `.pem` key, and click Connect. Configure your browser to use `SOCKS5 proxy at 127.0.0.1:<port>`.
 4. **Kill-Switch**: Check the Kill-Switch box before connecting. It blocks all non-VPN traffic via OS firewall rules and is automatically disabled on disconnect.
 5. **Auto-Reconnect**: Dropped tunnels are automatically restored (up to 5 retries with exponential back-off).
+
+---
+
+## CI/CD
+
+- **CI**: `.github/workflows/ci.yml` runs `ruff check .` and `pytest -q` on pull requests and pushes to `main`.
+- **Release**: `.github/workflows/release.yml` builds Windows and Linux artifacts and publishes them to GitHub Releases on `v*` tags.
+- **Local dev checks**: `pip install -r requirements-dev.txt` then run `ruff check .` and `pytest -q`.

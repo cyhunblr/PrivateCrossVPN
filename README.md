@@ -89,6 +89,22 @@ python privatecrossvpn.py
 
 Or import an existing `.conf` / `.ovpn` file via **Import from File...**.
 
+## Commit Style
+
+This repo uses Conventional Commits for clearer history and safer AI-generated commits:
+
+- `feat: ...`
+- `fix: ...`
+- `refactor: ...`
+- `chore: ...`
+
+To enable the local commit hook:
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/commit-msg
+```
+
 ---
 
 ## System Requirements

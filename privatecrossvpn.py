@@ -1274,16 +1274,29 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._wiz_ssh_pubkey_box.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="ew"); row += 1
 
         ssh_btn_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        ssh_btn_row.grid(row=row, column=0, padx=8, pady=(2, 6), sticky="w"); row += 1
+        ssh_btn_row.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
 
-        self._wiz_ssh_gen_btn = ctk.CTkButton(
-            ssh_btn_row, text="Generate SSH Key", width=150, command=self._wizard_generate_ssh_key)
-        self._wiz_ssh_gen_btn.pack(side="left", padx=(0, 8))
+        self._wiz_ssh_browse_btn = ctk.CTkButton(
+            ssh_btn_row, text="Use Existing Key…", width=150, command=self._wizard_browse_ssh_key)
+        self._wiz_ssh_browse_btn.pack(side="left", padx=(0, 8))
 
         self._wiz_ssh_copy_btn = ctk.CTkButton(
             ssh_btn_row, text="Copy Public Key", width=130,
             command=lambda: self._wizard_copy_to_clipboard(self._wizard_ssh_pubkey))
-        self._wiz_ssh_copy_btn.pack(side="left")
+        self._wiz_ssh_copy_btn.pack(side="left", padx=(0, 8))
+
+        # Generate new key row
+        ssh_gen_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        ssh_gen_row.grid(row=row, column=0, padx=8, pady=(0, 6), sticky="ew"); row += 1
+        ssh_gen_row.grid_columnconfigure(1, weight=1)
+
+        self._wiz_ssh_gen_btn = ctk.CTkButton(
+            ssh_gen_row, text="Generate New Key", width=150, command=self._wizard_generate_ssh_key)
+        self._wiz_ssh_gen_btn.pack(side="left", padx=(0, 8))
+
+        ctk.CTkLabel(ssh_gen_row, text="Name:", anchor="w").pack(side="left", padx=(8, 4))
+        self._wiz_ssh_keyname_entry = ctk.CTkEntry(ssh_gen_row, placeholder_text="id_ed25519", width=160)
+        self._wiz_ssh_keyname_entry.pack(side="left")
 
         # Check for existing key on startup
         self.after(300, self._wizard_check_ssh_key)
@@ -1318,21 +1331,43 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         self.after(350, lambda: self._wizard_on_provider_change("DigitalOcean"))
 
-        # ── Step 3: Connection Test ──────────────────────────────────────
-        row = self._wizard_build_header(scroll, "Step 3: Connection Test", row)
+        # ── Step 3: Server Connection & Terminal ─────────────────────────
+        row = self._wizard_build_header(scroll, "Step 3: Server Connection", row)
 
         test_row = ctk.CTkFrame(scroll, fg_color="transparent")
         test_row.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="ew"); row += 1
 
         self._wiz_test_btn = ctk.CTkButton(
-            test_row, text="Test SSH Connection", width=180, command=self._wizard_test_connection)
-        self._wiz_test_btn.pack(side="left", padx=(0, 12))
+            test_row, text="Test Connection", width=150, command=self._wizard_test_connection)
+        self._wiz_test_btn.pack(side="left", padx=(0, 8))
 
         self._wiz_test_status = ctk.CTkLabel(test_row, text="", anchor="w")
         self._wiz_test_status.pack(side="left", fill="x", expand=True)
 
         self._wiz_test_detail = ctk.CTkLabel(scroll, text="", anchor="w", font=ctk.CTkFont(size=11), wraplength=600)
-        self._wiz_test_detail.grid(row=row, column=0, padx=8, pady=(0, 6), sticky="w"); row += 1
+        self._wiz_test_detail.grid(row=row, column=0, padx=8, pady=(0, 4), sticky="w"); row += 1
+
+        # Remote command runner
+        ctk.CTkLabel(scroll, text="Run command on server:", anchor="w",
+                      font=ctk.CTkFont(size=12)).grid(row=row, column=0, padx=8, pady=(4, 2), sticky="w"); row += 1
+
+        cmd_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        cmd_row.grid(row=row, column=0, padx=8, pady=(0, 2), sticky="ew"); row += 1
+        cmd_row.grid_columnconfigure(0, weight=1)
+
+        self._wiz_remote_cmd = ctk.CTkEntry(cmd_row, placeholder_text="e.g. apt update && apt upgrade -y")
+        self._wiz_remote_cmd.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+
+        self._wiz_remote_run_btn = ctk.CTkButton(
+            cmd_row, text="Run", width=80, command=self._wizard_run_remote_cmd)
+        self._wiz_remote_run_btn.grid(row=0, column=1)
+
+        self._wiz_remote_output = ctk.CTkTextbox(scroll, height=100, state="disabled",
+            font=ctk.CTkFont(family="Consolas" if self.system.os_type == OSType.WINDOWS else "monospace", size=11))
+        self._wiz_remote_output.grid(row=row, column=0, padx=8, pady=(2, 6), sticky="ew"); row += 1
+
+        # Bind Enter key to run
+        self._wiz_remote_cmd.bind("<Return>", lambda e: self._wizard_run_remote_cmd())
 
         # ── Step 4: VPN Protocol & Profile ───────────────────────────────
         row = self._wizard_build_header(scroll, "Step 4: VPN Protocol & Profile", row)
@@ -1352,35 +1387,32 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._wiz_wg_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
         self._wiz_wg_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self._wiz_wg_frame, text="Run these commands on your server:", anchor="w",
-                      font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w", pady=(0, 2))
+        wg_btn_row = ctk.CTkFrame(self._wiz_wg_frame, fg_color="transparent")
+        wg_btn_row.grid(row=0, column=0, sticky="w", pady=(0, 4))
 
-        wg_cmds = (
-            "sudo apt install -y wireguard\n"
-            "cd /etc/wireguard && sudo bash -c 'umask 077\n"
-            "wg genkey | tee server_private.key | wg pubkey > server_public.key\n"
-            "wg genkey | tee client_private.key | wg pubkey > client_public.key'\n"
-            "sudo cat server_public.key && echo '---' && sudo cat client_private.key"
-        )
-        self._wiz_wg_cmds_box = ctk.CTkTextbox(self._wiz_wg_frame, height=80)
-        self._wiz_wg_cmds_box.grid(row=1, column=0, sticky="ew", pady=(0, 4))
-        self._wiz_wg_cmds_box.insert("1.0", wg_cmds)
-        self._wiz_wg_cmds_box.configure(state="disabled")
+        self._wiz_wg_install_btn = ctk.CTkButton(
+            wg_btn_row, text="Install WireGuard on Server", width=220,
+            fg_color="#2980b9", hover_color="#2471a3",
+            command=self._wizard_wg_install_remote)
+        self._wiz_wg_install_btn.pack(side="left", padx=(0, 8))
 
-        ctk.CTkButton(self._wiz_wg_frame, text="Copy Commands", width=130,
-                       command=lambda: self._wizard_copy_to_clipboard(wg_cmds)).grid(
-            row=2, column=0, sticky="w", pady=(0, 6))
+        self._wiz_wg_install_status = ctk.CTkLabel(wg_btn_row, text="", anchor="w")
+        self._wiz_wg_install_status.pack(side="left")
+
+        ctk.CTkLabel(self._wiz_wg_frame, text="After install completes, keys are fetched automatically. Or paste manually:",
+                      anchor="w", font=ctk.CTkFont(size=11), text_color="gray").grid(
+            row=1, column=0, sticky="w", pady=(0, 4))
 
         wg_fields = ctk.CTkFrame(self._wiz_wg_frame, fg_color="transparent")
-        wg_fields.grid(row=3, column=0, sticky="ew")
+        wg_fields.grid(row=2, column=0, sticky="ew")
         wg_fields.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(wg_fields, text="Server Public Key:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
-        self._wiz_wg_server_pubkey = ctk.CTkEntry(wg_fields, placeholder_text="Paste server_public.key here")
+        self._wiz_wg_server_pubkey = ctk.CTkEntry(wg_fields, placeholder_text="Auto-filled or paste server_public.key")
         self._wiz_wg_server_pubkey.grid(row=0, column=1, pady=2, sticky="ew")
 
         ctk.CTkLabel(wg_fields, text="Client Private Key:", anchor="w").grid(row=1, column=0, padx=(0, 4), pady=2, sticky="w")
-        self._wiz_wg_client_privkey = ctk.CTkEntry(wg_fields, placeholder_text="Paste client_private.key here")
+        self._wiz_wg_client_privkey = ctk.CTkEntry(wg_fields, placeholder_text="Auto-filled or paste client_private.key")
         self._wiz_wg_client_privkey.grid(row=1, column=1, pady=2, sticky="ew")
 
         ctk.CTkLabel(wg_fields, text="Tunnel Address:", anchor="w").grid(row=2, column=0, padx=(0, 4), pady=2, sticky="w")
@@ -1395,32 +1427,32 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._wiz_ovpn_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
         self._wiz_ovpn_frame.grid_columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(self._wiz_ovpn_frame, text="Run this on your server:", anchor="w",
-                      font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w", pady=(0, 2))
-
-        ovpn_cmds = (
-            "curl -O https://raw.githubusercontent.com/angristan/openvpn-install/master/openvpn-install.sh\n"
-            "chmod +x openvpn-install.sh\n"
-            "sudo ./openvpn-install.sh"
-        )
-        self._wiz_ovpn_cmds_box = ctk.CTkTextbox(self._wiz_ovpn_frame, height=55)
-        self._wiz_ovpn_cmds_box.grid(row=1, column=0, sticky="ew", pady=(0, 4))
-        self._wiz_ovpn_cmds_box.insert("1.0", ovpn_cmds)
-        self._wiz_ovpn_cmds_box.configure(state="disabled")
-
         ovpn_btn_row = ctk.CTkFrame(self._wiz_ovpn_frame, fg_color="transparent")
-        ovpn_btn_row.grid(row=2, column=0, sticky="w", pady=(0, 4))
+        ovpn_btn_row.grid(row=0, column=0, sticky="w", pady=(0, 4))
 
-        ctk.CTkButton(ovpn_btn_row, text="Copy Commands", width=130,
-                       command=lambda: self._wizard_copy_to_clipboard(ovpn_cmds)).pack(side="left", padx=(0, 8))
+        self._wiz_ovpn_install_btn = ctk.CTkButton(
+            ovpn_btn_row, text="Install OpenVPN on Server", width=220,
+            fg_color="#2980b9", hover_color="#2471a3",
+            command=self._wizard_ovpn_install_remote)
+        self._wiz_ovpn_install_btn.pack(side="left", padx=(0, 8))
 
-        ctk.CTkButton(ovpn_btn_row, text="Import .ovpn File", width=140,
-                       command=self._wizard_import_ovpn).pack(side="left")
+        self._wiz_ovpn_install_status = ctk.CTkLabel(ovpn_btn_row, text="", anchor="w")
+        self._wiz_ovpn_install_status.pack(side="left")
+
+        ctk.CTkLabel(self._wiz_ovpn_frame, text="Or import an existing .ovpn file:", anchor="w",
+                      font=ctk.CTkFont(size=11), text_color="gray").grid(
+            row=1, column=0, sticky="w", pady=(4, 2))
+
+        ovpn_import_row = ctk.CTkFrame(self._wiz_ovpn_frame, fg_color="transparent")
+        ovpn_import_row.grid(row=2, column=0, sticky="w", pady=(0, 4))
+
+        ctk.CTkButton(ovpn_import_row, text="Import .ovpn File", width=150,
+                       command=self._wizard_import_ovpn).pack(side="left", padx=(0, 8))
 
         self._wiz_ovpn_file_label = ctk.CTkLabel(
-            self._wiz_ovpn_frame, text="No .ovpn file imported yet", anchor="w",
+            ovpn_import_row, text="", anchor="w",
             font=ctk.CTkFont(size=11), text_color="gray")
-        self._wiz_ovpn_file_label.grid(row=3, column=0, sticky="w", pady=(0, 4))
+        self._wiz_ovpn_file_label.pack(side="left")
 
         # -- SSH SOCKS5 frame --
         self._wiz_ssh_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
@@ -1469,55 +1501,82 @@ class PrivateCrossVPNApp(ctk.CTk):
     # -----------------------------------------------------------------------
 
     def _wizard_check_ssh_key(self) -> None:
-        """Check for existing SSH keys and update the UI."""
-        key_candidates = [
-            Path.home() / ".ssh" / "id_ed25519",
-            Path.home() / ".ssh" / "id_rsa",
-            Path.home() / ".ssh" / "vpn_key",
-        ]
-        for key_path in key_candidates:
-            pub_path = key_path.with_suffix(".pub") if key_path.suffix != ".pub" else key_path
-            priv_path = pub_path.with_suffix("")
-            if pub_path.exists() and priv_path.exists():
-                try:
-                    pubkey = pub_path.read_text(encoding="utf-8").strip()
-                    self._wizard_ssh_key_path = priv_path
-                    self._wizard_ssh_pubkey = pubkey
-                    self._wiz_ssh_status.configure(
-                        text=f"Key found: {priv_path}", text_color="#2ecc71")
-                    self._wiz_ssh_pubkey_box.configure(state="normal")
-                    self._wiz_ssh_pubkey_box.delete("1.0", "end")
-                    self._wiz_ssh_pubkey_box.insert("1.0", pubkey)
-                    self._wiz_ssh_pubkey_box.configure(state="disabled")
-                    self._wiz_ssh_gen_btn.configure(state="disabled", text="Key Exists")
-                    logger.info("Wizard: SSH key found at %s", priv_path)
-                    return
-                except Exception:
-                    continue
+        """Auto-detect common SSH keys and show the first one found."""
+        ssh_dir = Path.home() / ".ssh"
+        candidates = ["id_ed25519", "id_rsa", "id_ecdsa", "vpn_key"]
+        for name in candidates:
+            priv = ssh_dir / name
+            pub = ssh_dir / f"{name}.pub"
+            if priv.exists() and pub.exists():
+                self._wizard_load_key(priv)
+                return
 
         self._wiz_ssh_status.configure(
-            text="No SSH key found. Click 'Generate SSH Key' to create one.", text_color="#f39c12")
-        self._wiz_ssh_gen_btn.configure(state="normal")
+            text="No SSH key auto-detected. Use 'Use Existing Key' to browse or 'Generate New Key' to create one.",
+            text_color="#f39c12")
+
+    def _wizard_load_key(self, priv_path: Path) -> None:
+        """Load and display an SSH key pair."""
+        pub_path = priv_path.with_suffix(".pub") if priv_path.suffix != ".pub" else priv_path
+        if priv_path.suffix == ".pub":
+            priv_path = priv_path.with_suffix("")
+
+        if not pub_path.exists():
+            self._wiz_ssh_status.configure(
+                text=f"Public key not found: {pub_path}", text_color="#e74c3c")
+            return
+
+        try:
+            pubkey = pub_path.read_text(encoding="utf-8").strip()
+        except Exception as exc:
+            self._wiz_ssh_status.configure(text=f"Cannot read key: {exc}", text_color="#e74c3c")
+            return
+
+        self._wizard_ssh_key_path = priv_path
+        self._wizard_ssh_pubkey = pubkey
+        self._wiz_ssh_status.configure(text=f"Using: {priv_path}", text_color="#2ecc71")
+        self._wiz_ssh_pubkey_box.configure(state="normal")
+        self._wiz_ssh_pubkey_box.delete("1.0", "end")
+        self._wiz_ssh_pubkey_box.insert("1.0", pubkey)
+        self._wiz_ssh_pubkey_box.configure(state="disabled")
+        logger.info("Wizard: SSH key loaded — %s", priv_path)
+
+    def _wizard_browse_ssh_key(self) -> None:
+        """Let the user pick any existing private key file."""
+        ssh_dir = Path.home() / ".ssh"
+        initial = str(ssh_dir) if ssh_dir.exists() else str(Path.home())
+        path = filedialog.askopenfilename(
+            title="Select SSH Private Key",
+            initialdir=initial,
+            filetypes=[("SSH Keys", "*.pem *.key"), ("All Files", "*.*")],
+        )
+        if path:
+            self._wizard_load_key(Path(path))
 
     def _wizard_generate_ssh_key(self) -> None:
-        """Generate a new Ed25519 SSH key pair."""
+        """Generate a new Ed25519 SSH key pair with user-specified name."""
         keygen = shutil.which("ssh-keygen")
         if not keygen:
             self._wiz_ssh_status.configure(
                 text="ssh-keygen not found. Install OpenSSH first.", text_color="#e74c3c")
             return
 
-        key_path = Path.home() / ".ssh" / "vpn_key"
-        ssh_dir = key_path.parent
+        key_name = self._wiz_ssh_keyname_entry.get().strip() or "id_ed25519"
+        # Sanitize: only allow filename-safe characters
+        key_name = re.sub(r'[^\w\-.]', '_', key_name)
+        ssh_dir = Path.home() / ".ssh"
         ssh_dir.mkdir(parents=True, exist_ok=True)
+        key_path = ssh_dir / key_name
 
         if key_path.exists():
-            self._wiz_ssh_status.configure(text="Key already exists at ~/.ssh/vpn_key", text_color="#f39c12")
-            self._wizard_check_ssh_key()
+            # Key already exists — just load it instead of overwriting
+            self._wiz_ssh_status.configure(
+                text=f"Key '{key_name}' already exists — loaded it.", text_color="#f39c12")
+            self._wizard_load_key(key_path)
             return
 
         self._wiz_ssh_gen_btn.configure(state="disabled", text="Generating…")
-        self._wiz_ssh_status.configure(text="Generating SSH key…", text_color="gray")
+        self._wiz_ssh_status.configure(text=f"Generating ~/.ssh/{key_name} …", text_color="gray")
 
         def _worker() -> None:
             try:
@@ -1527,20 +1586,19 @@ class PrivateCrossVPNApp(ctk.CTk):
                 )
                 if result.returncode == 0:
                     logger.info("Wizard: SSH key generated at %s", key_path)
-                    self.after(0, self._wizard_check_ssh_key)
+                    self.after(0, lambda: self._wizard_load_key(key_path))
                 else:
                     err = result.stderr.strip()
                     logger.error("ssh-keygen failed: %s", err)
                     self.after(0, lambda: self._wiz_ssh_status.configure(
                         text=f"Generation failed: {err}", text_color="#e74c3c"))
-                    self.after(0, lambda: self._wiz_ssh_gen_btn.configure(
-                        state="normal", text="Generate SSH Key"))
             except Exception as exc:
                 logger.error("ssh-keygen error: %s", exc)
                 self.after(0, lambda: self._wiz_ssh_status.configure(
                     text=f"Error: {exc}", text_color="#e74c3c"))
+            finally:
                 self.after(0, lambda: self._wiz_ssh_gen_btn.configure(
-                    state="normal", text="Generate SSH Key"))
+                    state="normal", text="Generate New Key"))
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -1631,9 +1689,257 @@ class PrivateCrossVPNApp(ctk.CTk):
                     text=f"Error: {exc}", text_color="#e74c3c"))
             finally:
                 self.after(0, lambda: self._wiz_test_btn.configure(
-                    state="normal", text="Test SSH Connection"))
+                    state="normal", text="Test Connection"))
 
         threading.Thread(target=_worker, daemon=True).start()
+
+    # -----------------------------------------------------------------------
+    # Wizard — Remote Command Execution
+    # -----------------------------------------------------------------------
+
+    def _wizard_get_ssh_args(self) -> Optional[list[str]]:
+        """Build the base SSH argument list from wizard fields. Returns None on validation failure."""
+        ip = self._wiz_server_ip.get().strip()
+        user = self._wiz_ssh_user.get().strip() or "root"
+        port = self._wiz_ssh_port.get().strip() or "22"
+
+        if not ip:
+            self._wiz_test_status.configure(text="Enter server IP in Step 2.", text_color="#e74c3c")
+            return None
+        if not self._wizard_ssh_key_path:
+            self._wiz_test_status.configure(text="Set up an SSH key in Step 1.", text_color="#e74c3c")
+            return None
+
+        ssh_bin = shutil.which("ssh")
+        if not ssh_bin:
+            self._wiz_test_status.configure(text="ssh not found.", text_color="#e74c3c")
+            return None
+
+        return [
+            ssh_bin,
+            "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=15",
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-i", str(self._wizard_ssh_key_path),
+            "-p", port,
+            f"{user}@{ip}",
+        ]
+
+    def _wizard_ssh_exec(
+        self,
+        command: str,
+        *,
+        on_output: Optional[Callable[[str], None]] = None,
+        on_done: Optional[Callable[[int, str, str], None]] = None,
+        timeout: int = 120,
+    ) -> None:
+        """
+        Execute a command on the remote server via SSH in a background thread.
+
+        on_output(line) is called for each stdout line (real-time).
+        on_done(returncode, stdout, stderr) is called when the command finishes.
+        """
+        base_args = self._wizard_get_ssh_args()
+        if base_args is None:
+            return
+
+        args = base_args + [command]
+        logger.info("Wizard SSH exec: %s", command)
+
+        def _worker() -> None:
+            try:
+                proc = subprocess.Popen(
+                    args, shell=False,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                )
+                stdout_lines: list[str] = []
+                if proc.stdout:
+                    for line in iter(proc.stdout.readline, ""):
+                        stripped = line.rstrip()
+                        stdout_lines.append(stripped)
+                        if on_output:
+                            self.after(0, lambda l=stripped: on_output(l))
+
+                proc.wait(timeout=timeout)
+                stderr = proc.stderr.read() if proc.stderr else ""
+                full_stdout = "\n".join(stdout_lines)
+
+                if on_done:
+                    self.after(0, lambda: on_done(proc.returncode, full_stdout, stderr))
+
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                if on_done:
+                    self.after(0, lambda: on_done(-1, "", "Command timed out"))
+            except Exception as exc:
+                if on_done:
+                    self.after(0, lambda: on_done(-1, "", str(exc)))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _wizard_run_remote_cmd(self) -> None:
+        """Run the user-typed command from the remote command entry."""
+        cmd = self._wiz_remote_cmd.get().strip()
+        if not cmd:
+            return
+
+        self._wiz_remote_run_btn.configure(state="disabled", text="Running…")
+        self._wiz_remote_output.configure(state="normal")
+        self._wiz_remote_output.delete("1.0", "end")
+        self._wiz_remote_output.insert("1.0", f"$ {cmd}\n")
+        self._wiz_remote_output.configure(state="disabled")
+
+        def _on_output(line: str) -> None:
+            self._wiz_remote_output.configure(state="normal")
+            self._wiz_remote_output.insert("end", line + "\n")
+            self._wiz_remote_output.see("end")
+            self._wiz_remote_output.configure(state="disabled")
+
+        def _on_done(rc: int, stdout: str, stderr: str) -> None:
+            self._wiz_remote_output.configure(state="normal")
+            if stderr:
+                self._wiz_remote_output.insert("end", stderr + "\n")
+            status = "OK" if rc == 0 else f"Exit code: {rc}"
+            self._wiz_remote_output.insert("end", f"[{status}]\n")
+            self._wiz_remote_output.see("end")
+            self._wiz_remote_output.configure(state="disabled")
+            self._wiz_remote_run_btn.configure(state="normal", text="Run")
+
+        self._wizard_ssh_exec(cmd, on_output=_on_output, on_done=_on_done)
+
+    def _wizard_wg_install_remote(self) -> None:
+        """Install WireGuard on the remote server, generate keys, and fetch them back."""
+        self._wiz_wg_install_btn.configure(state="disabled", text="Installing…")
+        self._wiz_wg_install_status.configure(text="Installing WireGuard…", text_color="#f39c12")
+
+        install_cmd = (
+            "export DEBIAN_FRONTEND=noninteractive && "
+            "apt-get update -qq && apt-get install -y -qq wireguard > /dev/null 2>&1 && "
+            "cd /etc/wireguard && umask 077 && "
+            "wg genkey | tee server_private.key | wg pubkey > server_public.key && "
+            "wg genkey | tee client_private.key | wg pubkey > client_public.key && "
+            "echo '===SERVER_PUBKEY===' && cat server_public.key && "
+            "echo '===CLIENT_PRIVKEY===' && cat client_private.key && "
+            "echo '===DONE==='"
+        )
+
+        collected: list[str] = []
+
+        def _on_output(line: str) -> None:
+            collected.append(line)
+            # Show progress in remote output box
+            self._wiz_remote_output.configure(state="normal")
+            self._wiz_remote_output.insert("end", line + "\n")
+            self._wiz_remote_output.see("end")
+            self._wiz_remote_output.configure(state="disabled")
+
+        def _on_done(rc: int, stdout: str, stderr: str) -> None:
+            self._wiz_wg_install_btn.configure(state="normal", text="Install WireGuard on Server")
+
+            if rc != 0:
+                self._wiz_wg_install_status.configure(
+                    text=f"Install failed (exit {rc}). Check output above.", text_color="#e74c3c")
+                if stderr:
+                    self._wiz_remote_output.configure(state="normal")
+                    self._wiz_remote_output.insert("end", stderr + "\n")
+                    self._wiz_remote_output.configure(state="disabled")
+                return
+
+            # Parse keys from output
+            full = "\n".join(collected)
+            server_pubkey = ""
+            client_privkey = ""
+
+            if "===SERVER_PUBKEY===" in full and "===CLIENT_PRIVKEY===" in full:
+                parts = full.split("===SERVER_PUBKEY===")
+                if len(parts) > 1:
+                    after_spk = parts[1].split("===CLIENT_PRIVKEY===")
+                    server_pubkey = after_spk[0].strip()
+                    if len(after_spk) > 1:
+                        client_privkey = after_spk[1].split("===DONE===")[0].strip()
+
+            if server_pubkey and client_privkey:
+                # Auto-fill the key fields
+                self._wiz_wg_server_pubkey.delete(0, "end")
+                self._wiz_wg_server_pubkey.insert(0, server_pubkey)
+                self._wiz_wg_client_privkey.delete(0, "end")
+                self._wiz_wg_client_privkey.insert(0, client_privkey)
+                self._wiz_wg_install_status.configure(
+                    text="Installed! Keys auto-filled below.", text_color="#2ecc71")
+                logger.info("Wizard: WireGuard installed, keys fetched.")
+            else:
+                self._wiz_wg_install_status.configure(
+                    text="Installed but couldn't parse keys. Paste them manually.", text_color="#f39c12")
+
+        self._wiz_remote_output.configure(state="normal")
+        self._wiz_remote_output.delete("1.0", "end")
+        self._wiz_remote_output.insert("1.0", "$ Installing WireGuard & generating keys…\n")
+        self._wiz_remote_output.configure(state="disabled")
+
+        self._wizard_ssh_exec(install_cmd, on_output=_on_output, on_done=_on_done, timeout=120)
+
+    def _wizard_ovpn_install_remote(self) -> None:
+        """Install OpenVPN on the remote server using the non-interactive script."""
+        self._wiz_ovpn_install_btn.configure(state="disabled", text="Installing…")
+        self._wiz_ovpn_install_status.configure(text="Installing OpenVPN (this takes 1-2 min)…", text_color="#f39c12")
+
+        ip = self._wiz_server_ip.get().strip()
+        # Non-interactive OpenVPN install
+        install_cmd = (
+            "export DEBIAN_FRONTEND=noninteractive AUTO_INSTALL=y "
+            "APPROVE_INSTALL=y APPROVE_IP=y "
+            f'ENDPOINT="{ip}" '
+            "PORT_CHOICE=1 PROTOCOL_CHOICE=1 DNS=9 COMPRESSION_ENABLED=n CUSTOMIZE_ENC=n "
+            'CLIENT="privatecrossvpn" PASS=1 && '
+            "curl -sO https://raw.githubusercontent.com/angristan/openvpn-install/master/openvpn-install.sh && "
+            "chmod +x openvpn-install.sh && "
+            "bash openvpn-install.sh && "
+            "cat /root/privatecrossvpn.ovpn"
+        )
+
+        ovpn_content: list[str] = []
+        capture_ovpn = [False]  # mutable flag
+
+        def _on_output(line: str) -> None:
+            # Detect when .ovpn content starts
+            if line.strip().startswith("client") or capture_ovpn[0]:
+                capture_ovpn[0] = True
+                ovpn_content.append(line)
+            self._wiz_remote_output.configure(state="normal")
+            self._wiz_remote_output.insert("end", line + "\n")
+            self._wiz_remote_output.see("end")
+            self._wiz_remote_output.configure(state="disabled")
+
+        def _on_done(rc: int, stdout: str, stderr: str) -> None:
+            self._wiz_ovpn_install_btn.configure(state="normal", text="Install OpenVPN on Server")
+
+            if rc != 0 and not ovpn_content:
+                self._wiz_ovpn_install_status.configure(
+                    text=f"Install failed (exit {rc}).", text_color="#e74c3c")
+                return
+
+            if ovpn_content:
+                # Save the .ovpn file locally
+                ovpn_text = "\n".join(ovpn_content)
+                dest = self.settings.configs_dir / "privatecrossvpn.ovpn"
+                dest.write_text(ovpn_text, encoding="utf-8")
+                self._wiz_ovpn_import_path = dest
+                self._wiz_ovpn_file_label.configure(
+                    text=f"Downloaded: {dest.name}", text_color="#2ecc71")
+                self._wiz_ovpn_install_status.configure(
+                    text="Installed! Config downloaded.", text_color="#2ecc71")
+                logger.info("Wizard: OpenVPN installed, config saved to %s", dest)
+            else:
+                self._wiz_ovpn_install_status.configure(
+                    text="Installed but couldn't download config. Use 'Import .ovpn File' manually.",
+                    text_color="#f39c12")
+
+        self._wiz_remote_output.configure(state="normal")
+        self._wiz_remote_output.delete("1.0", "end")
+        self._wiz_remote_output.insert("1.0", "$ Installing OpenVPN (non-interactive)…\n")
+        self._wiz_remote_output.configure(state="disabled")
+
+        self._wizard_ssh_exec(install_cmd, on_output=_on_output, on_done=_on_done, timeout=180)
 
     def _wizard_on_proto_change(self, proto: str) -> None:
         """Show/hide protocol-specific frames."""
