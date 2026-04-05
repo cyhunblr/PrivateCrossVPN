@@ -99,6 +99,9 @@ This repo uses Conventional Commits for clearer history and safer AI-generated c
 - `fix: ...`
 - `refactor: ...`
 - `chore: ...`
+- `docs: ...`
+
+When VS Code or Copilot suggests a commit message, keep it in this format instead of a generic summary.
 
 To enable the local commit hook:
 
