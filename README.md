@@ -4,14 +4,28 @@
 
 <p align="center" style="margin-top: 6px;">
   <span style="font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">PrivateCrossVPN</span><br>
-  <strong>A production-grade, cross-platform VPN management application</strong><br>
+  <strong>Production-ready VPN client manager for self-hosted infrastructure</strong><br>
+</p>
+
+<p align="center">
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/release.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/releases"><img src="https://img.shields.io/github/v/release/cyhunblr/PrivateCrossVPN?sort=semver" alt="Latest Release"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/blob/main/LICENSE"><img src="https://img.shields.io/github/license/cyhunblr/PrivateCrossVPN" alt="License"></a>
 </p>
 
 ---
 
-PrivateCrossVPN provides a unified GUI to manage WireGuard, OpenVPN, and SSH SOCKS5 tunnels — with a built-in config editor, kill-switch, auto-reconnect, and real-time IP monitoring. No third-party VPN wrappers; it talks directly to system-installed binaries.
+PrivateCrossVPN is a desktop control plane for your own VPN endpoints. It provides one interface to configure and operate WireGuard, OpenVPN, and SSH SOCKS5 tunnels with operational safety features built in.
 
-Releases are now created automatically from `main`. Each successful push bumps the patch version, builds Windows and Linux executables, tags the release, and publishes it on GitHub.
+Core product goals:
+
+- Reliable connection lifecycle management for daily use.
+- Security-first traffic control via kill-switch logic.
+- Practical profile management for multiple servers and protocols.
+- Reproducible release artifacts from CI/CD.
+
+Releases are produced automatically from `main` and published with prebuilt artifacts.
 
 ---
 
@@ -36,10 +50,10 @@ Releases are now created automatically from `main`. Each successful push bumps t
 
 ```
 +---------------------------+------------------------------------------+
-|  PrivateCrossVPN v1.1.5   |  Status & Location                       |
+|  PrivateCrossVPN v1.2.0   |  Status & Location                       |
 |                           |  ● Connected          Uptime: 00:14:32   |
 |  Saved Profiles           |  IP: 185.xxx.xxx.xx   Kill-Switch: ON    |
-|  [my-wireguard     ][X]  |  Location: Frankfurt, Hesse, DE          |
+|  [my-wireguard     ][X]  |  Location: Frankfurt, Hesse, DE           |
 |                           |  ISP: DigitalOcean LLC                   |
 |  Protocol                 |                                          |
 |  [WireGuard         v]   |  +--------------------------------------+ |
@@ -70,17 +84,19 @@ Releases are now created automatically from `main`. Each successful push bumps t
 pip install -r requirements.txt
 ```
 
-The only Python dependency is `customtkinter`. System binaries (WireGuard, OpenVPN, SSH) must be installed separately.
+Python dependency footprint is intentionally small (`customtkinter`). Protocol binaries (WireGuard, OpenVPN, SSH) are installed at OS level.
 
 ### 2. Run
 
 ```bash
-# Linux (recommended — preserves user Python packages under sudo)
-sudo -E python3 privatecrossvpn.py
+# Linux
+python3 privatecrossvpn.py
 
 # Windows (right-click terminal -> Run as Administrator)
 python privatecrossvpn.py
 ```
+
+On Linux, privileged operations (tunnel/firewall actions) request authentication at runtime when needed.
 
 ### 3. Create a Profile
 
@@ -117,9 +133,16 @@ chmod +x .githooks/commit-msg
 ### Platform
 
 - **Linux**: x64 distro with compatible glibc for the selected release artifact (`ubuntu-20.04`, `ubuntu-22.04`, or `ubuntu-24.04` build)
-- **Windows**: choose the closest GitHub-hosted build artifact (`windows-2022` or `windows-latest`)
+- **Windows**: use the GitHub-hosted build artifact (`windows-latest`)
 
-CI/CD note: CI runs on your self-hosted Linux x64 runner. Release builds publish a matrix of Linux and Windows artifacts. Linux includes one self-hosted `ubuntu-20.04` build plus GitHub-hosted `ubuntu-22.04` and `ubuntu-24.04` builds. Windows artifacts are built on GitHub-hosted Windows Server runners (`windows-2022` and `windows-latest`), not desktop Win10/Win11 hosts.
+CI/CD note: CI runs on your self-hosted Linux x64 runner. Release builds publish a Linux matrix (`ubuntu-20.04` self-hosted, `ubuntu-22.04` and `ubuntu-24.04` GitHub-hosted) plus one Windows artifact (`windows-latest`).
+
+### Release Artifacts
+
+- `PrivateCrossVPN-linux-ubuntu-20.04`
+- `PrivateCrossVPN-linux-ubuntu-22.04`
+- `PrivateCrossVPN-linux-ubuntu-24.04`
+- `PrivateCrossVPN-windows-latest.exe`
 
 ### Python
 

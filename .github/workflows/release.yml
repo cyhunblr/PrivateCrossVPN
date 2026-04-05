@@ -42,14 +42,37 @@ jobs:
 
           latest_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)
           if [[ -z "$latest_tag" ]]; then
-            base_version="1.1.5"
+            base_version="1.2.0"
+            log_range="HEAD"
           else
             base_version="${latest_tag#v}"
+            log_range="${latest_tag}..HEAD"
+          fi
+
+          commit_subjects=$(git log --format=%s $log_range || true)
+          commit_bodies=$(git log --format=%B $log_range || true)
+
+          bump_type="patch"
+          if echo "$commit_bodies" | grep -Eq 'BREAKING CHANGE|BREAKING-CHANGE'; then
+            bump_type="major"
+          elif echo "$commit_subjects" | grep -Eq '^[a-zA-Z0-9_-]+(\([^)]+\))?!:'; then
+            bump_type="major"
+          elif echo "$commit_subjects" | grep -Eq '^feat(\([^)]+\))?:'; then
+            bump_type="minor"
           fi
 
           IFS='.' read -r major minor patch <<< "$base_version"
-          next_patch=$((patch + 1))
-          version="${major}.${minor}.${next_patch}"
+          case "$bump_type" in
+            major)
+              version="$((major + 1)).0.0"
+              ;;
+            minor)
+              version="${major}.$((minor + 1)).0"
+              ;;
+            *)
+              version="${major}.${minor}.$((patch + 1))"
+              ;;
+          esac
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
