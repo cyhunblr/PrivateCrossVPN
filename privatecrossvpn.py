@@ -535,10 +535,6 @@ class SystemHandler:
             except Exception:
                 has_tty = False
 
-            # Prefer sudo when launched from a terminal so password prompt stays visible.
-            if has_tty and shutil.which("sudo"):
-                candidates.append(["sudo", *relaunch_target])
-
             if shutil.which("pkexec"):
                 pkexec_cmd = ["pkexec", "env"]
                 for key in ("DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
@@ -548,7 +544,7 @@ class SystemHandler:
                 pkexec_cmd.extend(relaunch_target)
                 candidates.append(pkexec_cmd)
 
-            if shutil.which("sudo") and not has_tty:
+            if has_tty and shutil.which("sudo"):
                 candidates.append(["sudo", *relaunch_target])
 
             for args in candidates:
