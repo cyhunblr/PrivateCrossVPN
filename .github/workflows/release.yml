@@ -12,7 +12,7 @@ on:
 
 concurrency:
   group: auto-release-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -22,6 +22,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     outputs:
+      release_allowed: ${{ steps.freshness.outputs.release_allowed }}
       version: ${{ steps.bump.outputs.version }}
       tag: ${{ steps.bump.outputs.tag }}
     steps:
@@ -52,9 +53,25 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
+      - name: Check commit freshness
+        id: freshness
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          latest_main_sha=$(git rev-parse origin/main)
+
+          if [[ "$target_sha" == "$latest_main_sha" ]]; then
+            echo "release_allowed=true" >> "$GITHUB_OUTPUT"
+            echo "Release allowed for latest main SHA: $target_sha"
+          else
+            echo "release_allowed=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping stale run. target=$target_sha latest_main=$latest_main_sha"
+          fi
+
   build-windows:
     needs: version
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.version.outputs.release_allowed == 'true'
     runs-on: windows-latest
     env:
       PVCVPN_VERSION: ${{ needs.version.outputs.version }}
@@ -95,7 +112,7 @@ jobs:
 
   build-linux:
     needs: version
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.version.outputs.release_allowed == 'true'
     runs-on: ubuntu-20.04
     env:
       PVCVPN_VERSION: ${{ needs.version.outputs.version }}
@@ -137,7 +154,7 @@ jobs:
       - version
       - build-windows
       - build-linux
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.version.outputs.release_allowed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
