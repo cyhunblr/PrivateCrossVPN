@@ -122,7 +122,7 @@ sudo ./dist/PrivateCrossVPN
 
 ## CI/CD
 
-- **CI**: `.github/workflows/ci.yml` runs `ruff check .` and `pytest -q` on pull requests and pushes to `main`.
+- **CI**: `.github/workflows/ci.yml` runs markdown lint, `ruff check .`, and `pytest -q` on pull requests and pushes to all branches.
 - **Release**: `.github/workflows/release.yml` runs only after the CI workflow succeeds on `main`, bumps the patch version automatically, builds Windows and Ubuntu 20.04 executables, creates a `v*` tag, and publishes the GitHub Release.
 - **Markdown lint**: CI also runs `markdownlint-cli` against `README.md`, `BUILD.md`, and the docs under `docs/`.
 - **Local dev checks**: `pip install -r requirements-dev.txt` then run `ruff check .` and `pytest -q`.
