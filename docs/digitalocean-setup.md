@@ -114,12 +114,15 @@ After your Droplet is created, you can do the initial setup directly in PrivateC
 1. Open the app: `sudo -E python3 privatecrossvpn.py`
 2. Go to **Setup**
 3. Complete wizard steps:
-  - **Step 1: SSH Key** -> generate or load your key
-  - **Step 2: Server Info** -> enter `YOUR_DROPLET_IP`, SSH user, and port
-  - **Step 3: Server Connection** -> use **Test Connection**
+
+   - **Step 1: SSH Key** → generate or load your key
+   - **Step 2: Server Info** → enter `YOUR_DROPLET_IP`, SSH user, and port
+   - **Step 3: Server Connection** → use **Test Connection**
+
 4. In **Step 3**, you can:
-  - Click **Copy SSH Command** if you want to open a manual SSH shell
-  - Or click **Run Initial Server Setup** to run baseline hardening automatically on the server
+
+   - Click **Copy SSH Command** if you want to open a manual SSH shell
+   - Or click **Run Initial Server Setup** to run baseline hardening automatically on the server
 
 The automatic setup currently runs:
 
