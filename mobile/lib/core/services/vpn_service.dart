@@ -33,7 +33,8 @@ class VpnService {
   // -------------------------------------------------------------------------
 
   Future<void> connect(ConnectionProfile profile) async {
-    if (_state == TunnelState.connected || _state == TunnelState.connecting) return;
+    if (_state == TunnelState.connected || _state == TunnelState.connecting)
+      return;
     _setState(TunnelState.connecting);
     _activeProfile = profile;
     try {
@@ -115,7 +116,8 @@ class VpnService {
           completer.complete();
         } else if (stage == VPNStage.error && !completer.isCompleted) {
           completer.completeError(Exception('OpenVPN connection error'));
-        } else if (stage == VPNStage.disconnected && _state == TunnelState.connected) {
+        } else if (stage == VPNStage.disconnected &&
+            _state == TunnelState.connected) {
           _setState(TunnelState.disconnected);
           _activeProfile = null;
           _connectedAt = null;
@@ -131,7 +133,8 @@ class VpnService {
 
     // Build .ovpn config string
     final config = _buildOvpnConfig(profile);
-    await _ovpn!.connect(config, profile.name, certIsRequired: profile.ca.isNotEmpty);
+    await _ovpn!
+        .connect(config, profile.name, certIsRequired: profile.ca.isNotEmpty);
 
     // Wait up to 30 s for connected stage
     await completer.future.timeout(const Duration(seconds: 30));
@@ -163,7 +166,8 @@ class VpnService {
   // SSH SOCKS5 (via dartssh2 — pure Dart, no subprocess)
 
   Future<void> _connectSSH(SSHProfile profile) async {
-    final socket = await SSHSocket.connect(profile.host, int.parse(profile.port));
+    final socket =
+        await SSHSocket.connect(profile.host, int.parse(profile.port));
     final identities = await _loadIdentities(profile.keyPath);
     final client = SSHClient(
       socket,
@@ -171,12 +175,22 @@ class VpnService {
       identities: identities,
     );
 
-    final forward = await client.forwardDynamic(
-      bindHost: '127.0.0.1',
-      bindPort: int.parse(profile.socksPort),
-    );
-
-    _sshHandle = _SshHandle(client: client, forward: forward);
+    try {
+      // dartssh2<2.17.0 does not expose forwardDynamic/SSHDynamicForward.
+      final dynamic dynClient = client;
+      final dynamic forward = await dynClient.forwardDynamic(
+        bindHost: '127.0.0.1',
+        bindPort: int.parse(profile.socksPort),
+      );
+      _sshHandle = _SshHandle(client: client, forward: forward);
+    } on NoSuchMethodError {
+      client.close();
+      await client.done;
+      throw UnsupportedError(
+        'Current dartssh2 version does not support dynamic SOCKS forwarding. '
+        'Use dartssh2 >=2.17.0 for SSH SOCKS5 mode.',
+      );
+    }
   }
 
   Future<List<SSHKeyPair>> _loadIdentities(String? keyPath) async {
@@ -203,7 +217,7 @@ class VpnService {
 
 class _SshHandle {
   final SSHClient client;
-  final SSHDynamicForward forward;
+  final dynamic forward;
 
   _SshHandle({required this.client, required this.forward});
 

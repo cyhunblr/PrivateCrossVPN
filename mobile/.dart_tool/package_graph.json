@@ -286,6 +286,11 @@
       ]
     },
     {
+      "name": "pinenacl",
+      "version": "0.6.0",
+      "dependencies": []
+    },
+    {
       "name": "pointycastle",
       "version": "3.9.1",
       "dependencies": [
@@ -293,11 +298,6 @@
         "convert",
         "js"
       ]
-    },
-    {
-      "name": "pinenacl",
-      "version": "0.6.0",
-      "dependencies": []
     },
     {
       "name": "convert",

@@ -141,11 +141,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('IP: ${info.ip}',
-                                      style: const TextStyle(color: Colors.white70)),
+                                      style: const TextStyle(
+                                          color: Colors.white70)),
                                   Text('Location: ${info.location}',
-                                      style: const TextStyle(color: Colors.white70)),
+                                      style: const TextStyle(
+                                          color: Colors.white70)),
                                   Text('ISP: ${info.org}',
-                                      style: const TextStyle(color: Colors.white70)),
+                                      style: const TextStyle(
+                                          color: Colors.white70)),
                                 ],
                               )
                             : const SizedBox(),
@@ -153,7 +156,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             color: Colors.white, strokeWidth: 2),
                         error: (_, __) => const SizedBox(),
                       ),
-                      _UptimeWidget(connectedAt: VpnService.instance.connectedAt),
+                      _UptimeWidget(
+                          connectedAt: VpnService.instance.connectedAt),
                     ],
                   ],
                 ),
@@ -165,7 +169,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             // Profile selector
             profiles.when(
               data: (list) => DropdownButtonFormField<String>(
-                initialValue: selected,
+                // ignore: deprecated_member_use
+                value: selected,
                 decoration: const InputDecoration(
                   labelText: 'Profile',
                   border: OutlineInputBorder(),
@@ -175,7 +180,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     .toList(),
                 onChanged: isConnected
                     ? null
-                    : (v) => ref.read(selectedProfileProvider.notifier).state = v,
+                    : (v) =>
+                        ref.read(selectedProfileProvider.notifier).state = v,
               ),
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('Error: $e'),
@@ -213,8 +219,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         : () async {
                             final ok = await _confirmDelete(context, selected);
                             if (ok) {
-                              await ProfileManager.instance.deleteProfile(selected);
-                              ref.read(selectedProfileProvider.notifier).state = null;
+                              await ProfileManager.instance
+                                  .deleteProfile(selected);
+                              ref.read(selectedProfileProvider.notifier).state =
+                                  null;
                               ref.invalidate(profilesProvider);
                             }
                           },
@@ -262,8 +270,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: const Text('Cancel')),
               TextButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child:
-                      const Text('Delete', style: TextStyle(color: Colors.red))),
+                  child: const Text('Delete',
+                      style: TextStyle(color: Colors.red))),
             ],
           ),
         ) ??
