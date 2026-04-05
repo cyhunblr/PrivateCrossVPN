@@ -20,7 +20,7 @@ permissions:
 jobs:
   version:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     outputs:
       release_allowed: ${{ steps.freshness.outputs.release_allowed }}
       version: ${{ steps.bump.outputs.version }}
@@ -155,7 +155,7 @@ jobs:
       - build-windows
       - build-linux
     if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.version.outputs.release_allowed == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

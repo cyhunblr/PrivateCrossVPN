@@ -97,3 +97,128 @@ def test_tunnel_engine_maps_protocol_to_tunnel_class(monkeypatch, tmp_path):
         module.TunnelEngine.create(system, ssh),
         module.SSHTunnel,
     )
+
+
+def test_build_ssh_login_command_quotes_key_path(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    command = module.build_ssh_login_command(
+        Path("/home/test/My Keys/vpn_key"),
+        "203.0.113.10",
+        "root",
+        "22",
+    )
+
+    assert command == "ssh -i '/home/test/My Keys/vpn_key' -p 22 root@203.0.113.10"
+
+
+def test_sanitize_wg_interface_name_enforces_linux_rules(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    assert module.sanitize_wg_interface_name("digitalocean-wireguard") == "digitalocean_wi"
+    assert module.sanitize_wg_interface_name("demo/team-vpn") == "demo_team_vpn"
+
+
+def test_generate_wireguard_conf_uses_compatible_filename(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    settings = module.AppSettings()
+    settings.configs_dir = tmp_path / "configs"
+    manager = module.ProfileManager(settings)
+
+    conf = manager.generate_wireguard_conf(
+        "digitalocean-wireguard",
+        {
+            "wg_private_key": "priv",
+            "wg_address": "10.0.0.2/24",
+            "wg_public_key": "pub",
+            "wg_endpoint": "vpn.example.com:51820",
+            "wg_allowed_ips": "0.0.0.0/0",
+        },
+    )
+
+    assert conf.name == "digitalocean_wi.conf"
+
+
+def test_strip_wireguard_dns_directives_removes_dns_lines(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    original = """[Interface]
+PrivateKey = abc
+Address = 10.0.0.2/24
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = def
+AllowedIPs = 0.0.0.0/0
+"""
+
+    stripped = module.strip_wireguard_dns_directives(original)
+    assert "DNS = 1.1.1.1" not in stripped
+    assert "Address = 10.0.0.2/24" in stripped
+
+
+def test_generate_wireguard_conf_sets_strict_permissions(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    settings = module.AppSettings()
+    settings.configs_dir = tmp_path / "configs"
+    manager = module.ProfileManager(settings)
+
+    conf = manager.generate_wireguard_conf(
+        "do-wg",
+        {
+            "wg_private_key": "priv",
+            "wg_address": "10.0.0.2/24",
+            "wg_public_key": "pub",
+            "wg_endpoint": "vpn.example.com:51820",
+            "wg_allowed_ips": "0.0.0.0/0",
+        },
+    )
+
+    mode = conf.stat().st_mode & 0o777
+    assert mode == 0o600
+
+
+def test_build_local_dependency_install_commands_for_linux(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    commands = module.build_local_dependency_install_commands(
+        module.OSType.LINUX,
+        ["WireGuard", "OpenVPN", "OpenSSH Client"],
+        elevated=True,
+        has_pkexec=True,
+        has_winget=False,
+    )
+
+    assert commands == [
+        ["apt-get", "update"],
+        ["apt-get", "install", "-y", "wireguard", "openvpn", "openssh-client"],
+    ]
+
+
+def test_build_local_dependency_install_commands_for_windows(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    commands = module.build_local_dependency_install_commands(
+        module.OSType.WINDOWS,
+        ["WireGuard", "OpenVPN", "OpenSSH Client"],
+        elevated=True,
+        has_pkexec=False,
+        has_winget=True,
+    )
+
+    assert commands == [
+        [
+            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+            "Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
+        ],
+        [
+            "winget", "install", "-e", "--id", "WireGuard.WireGuard",
+            "--accept-package-agreements", "--accept-source-agreements",
+        ],
+        [
+            "winget", "install", "-e", "--id", "OpenVPNTechnologies.OpenVPN",
+            "--accept-package-agreements", "--accept-source-agreements",
+        ],
+    ]

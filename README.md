@@ -4,7 +4,7 @@
 
 <p align="center">
   <strong>A production-grade, cross-platform VPN management application</strong><br>
-  Windows 11 &bull; Ubuntu 20.04/22.04 &bull; Python 3.10+ &bull; CustomTkinter
+  Windows 11 &bull; Ubuntu 20.04 &bull; Python 3.10+ &bull; CustomTkinter
 </p>
 
 ---
@@ -28,7 +28,7 @@ Releases are now created automatically from `main`. Each successful push bumps t
 | **Profile Manager** | Save, load, switch, and delete profiles. Last-used profile is remembered across sessions |
 | **IP Monitor** | Real-time public IP, location, ISP, and timezone via ipinfo.io |
 | **Configurable Storage** | Default config directory: `~/.privatecrossvpn/configs/` — changeable from the UI |
-| **Cross-Platform** | Single codebase for Windows 11 and Ubuntu 20.04/22.04 |
+| **Cross-Platform** | Single codebase for Windows 11 and Ubuntu 20.04 |
 
 ---
 
@@ -99,6 +99,9 @@ This repo uses Conventional Commits for clearer history and safer AI-generated c
 - `fix: ...`
 - `refactor: ...`
 - `chore: ...`
+- `docs: ...`
+
+When VS Code or Copilot suggests a commit message, keep it in this format instead of a generic summary.
 
 To enable the local commit hook:
 
@@ -114,6 +117,7 @@ chmod +x .githooks/commit-msg
 ### Platform
 
 - **Linux**: Ubuntu 20.04 / 22.04 (or any Debian-based distro)
+- **Linux**: Ubuntu 20.04
 - **Windows**: Windows 11 (Windows 10 should also work)
 
 ### Python

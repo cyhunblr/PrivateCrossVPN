@@ -107,6 +107,35 @@ Now when creating a Droplet, select this key under **Authentication → SSH Key*
 
 ## 2. Initial Server Setup
 
+### Recommended (in-app wizard)
+
+After your Droplet is created, you can do the initial setup directly in PrivateCrossVPN:
+
+1. Open the app: `sudo -E python3 privatecrossvpn.py`
+2. Go to **Setup**
+3. Complete wizard steps:
+
+   - **Step 1: SSH Key** → generate or load your key
+   - **Step 2: Server Info** → enter `YOUR_DROPLET_IP`, SSH user, and port
+   - **Step 3: Server Connection** → use **Test Connection**
+
+4. In **Step 3**, you can:
+
+   - Click **Copy SSH Command** if you want to open a manual SSH shell
+   - Or click **Run Initial Server Setup** to run baseline hardening automatically on the server
+
+The automatic setup currently runs:
+
+```bash
+apt update && apt upgrade -y
+ufw allow OpenSSH
+ufw --force enable
+id -u vpnuser >/dev/null 2>&1 || adduser --disabled-password --gecos "" vpnuser
+usermod -aG sudo vpnuser
+```
+
+### Manual alternative (SSH shell)
+
 SSH into your new droplet:
 
 ```bash
@@ -294,10 +323,33 @@ Click **Save Profile**, then **Connect**. Configure your browser to use SOCKS5 p
 sudo -E python3 privatecrossvpn.py
 ```
 
+If you use the new **Setup** wizard, the full flow is:
+
+1. **Step 1**: SSH Key
+2. **Step 2**: Server Info
+3. **Step 3**: Server Connection / Initial setup
+4. **Step 4**: Protocol Setup
+5. **Step 5**: Create Profile
+
 1. Select your saved profile from the dropdown
 2. (Optional) Enable **Kill-Switch**
 3. Click **Connect**
 4. Verify: the Status card should show your Droplet's IP and location
+
+### What Is Kill-Switch?
+
+Kill-switch is a safety feature that prevents traffic leaks outside the VPN tunnel if the VPN connection drops.
+
+- When enabled, the app blocks non-VPN outbound traffic using OS firewall rules.
+- When the VPN reconnects, traffic continues through the tunnel.
+- When you disconnect from the app, kill-switch rules are removed automatically.
+
+PrivateCrossVPN implements kill-switch per platform:
+
+- Linux: `iptables` rules
+- Windows: `netsh advfirewall` rules
+
+Note: Kill-switch runs on your local client machine, not on the droplet.
 
 ---
 
