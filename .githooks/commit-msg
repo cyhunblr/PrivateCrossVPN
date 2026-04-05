@@ -88,6 +88,22 @@ EOF
   exit 1
 fi
 
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+else
+  PYTHON_BIN=""
+fi
+
+if [ -n "$PYTHON_BIN" ]; then
+  "$PYTHON_BIN" scripts/version_sync.py --write --pending-message-file "$commit_msg_file" >/dev/null
+  git add privatecrossvpn.py .github/workflows/release.yml README.md
+  if [ -f mobile/pubspec.yaml ]; then
+    git add mobile/pubspec.yaml
+  fi
+fi
+
 if [ -x "node_modules/.bin/commitlint" ]; then
   node_modules/.bin/commitlint --edit "$1"
 elif command -v npx >/dev/null 2>&1; then

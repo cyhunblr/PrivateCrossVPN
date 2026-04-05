@@ -45,7 +45,27 @@ def run_git(args: list[str], cwd: Path) -> str:
     return result.stdout.strip()
 
 
-def compute_next_version(repo_root: Path, base_version: str) -> str:
+def _detect_bump_type(subjects: str, bodies: str) -> str:
+    bump_type = "patch"
+    if re.search(r"BREAKING CHANGE|BREAKING-CHANGE", bodies):
+        bump_type = "major"
+    elif re.search(r"^[a-zA-Z0-9_-]+\([^)]+\)!:", subjects, re.MULTILINE) or re.search(
+        r"^[a-zA-Z0-9_-]+!:", subjects, re.MULTILINE
+    ):
+        bump_type = "major"
+    elif re.search(r"^feat(\([^)]+\))?:", subjects, re.MULTILINE):
+        bump_type = "minor"
+    return bump_type
+
+
+def _bump_rank(bump_type: str) -> int:
+    ranks = {"patch": 0, "minor": 1, "major": 2}
+    return ranks.get(bump_type, 0)
+
+
+def compute_next_version(
+    repo_root: Path, base_version: str, pending_message: str | None = None
+) -> str:
     latest_tag = run_git(["tag", "--list", "v*", "--sort=-v:refname"], repo_root)
     latest_tag = latest_tag.splitlines()[0] if latest_tag else ""
 
@@ -59,15 +79,15 @@ def compute_next_version(repo_root: Path, base_version: str) -> str:
     subjects = run_git(["log", "--format=%s", log_range], repo_root)
     bodies = run_git(["log", "--format=%B", log_range], repo_root)
 
-    bump_type = "patch"
-    if re.search(r"BREAKING CHANGE|BREAKING-CHANGE", bodies):
-        bump_type = "major"
-    elif re.search(r"^[a-zA-Z0-9_-]+\([^)]+\)!:", subjects, re.MULTILINE) or re.search(
-        r"^[a-zA-Z0-9_-]+!:", subjects, re.MULTILINE
-    ):
-        bump_type = "major"
-    elif re.search(r"^feat(\([^)]+\))?:", subjects, re.MULTILINE):
-        bump_type = "minor"
+    bump_type = _detect_bump_type(subjects, bodies)
+
+    if pending_message:
+        pending_subject = (
+            pending_message.splitlines()[0] if pending_message.splitlines() else ""
+        )
+        pending_bump = _detect_bump_type(pending_subject, pending_message)
+        if _bump_rank(pending_bump) > _bump_rank(bump_type):
+            bump_type = pending_bump
 
     major, minor, patch = (int(p) for p in base.split("."))
     if bump_type == "major":
@@ -100,6 +120,14 @@ def build_targets(repo_root: Path, version: str) -> list[SyncTarget]:
             ),
             replacement=rf"\g<1>{version}\g<2>",
             name="README screenshot version",
+        ),
+        SyncTarget(
+            path=repo_root / "README.md",
+            pattern=re.compile(
+                r"(img\.shields\.io/badge/release-v)[0-9]+\.[0-9]+\.[0-9]+(-blue)"
+            ),
+            replacement=rf"\g<1>{version}\g<2>",
+            name="README release badge version",
         ),
         SyncTarget(
             path=repo_root / "mobile" / "pubspec.yaml",
@@ -145,6 +173,10 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_BASE_VERSION,
         help=f"Fallback base version when no v* tag exists (default: {DEFAULT_BASE_VERSION}).",
     )
+    parser.add_argument(
+        "--pending-message-file",
+        help="Optional path to pending commit message file to include its bump type in version calculation.",
+    )
     return parser.parse_args()
 
 
@@ -156,8 +188,18 @@ def main() -> int:
 
     repo_root = Path(__file__).resolve().parent.parent
 
+    pending_message = None
+    if args.pending_message_file:
+        try:
+            pending_message = Path(args.pending_message_file).read_text(
+                encoding="utf-8"
+            )
+        except Exception as exc:
+            print(f"Could not read pending message file: {exc}", file=sys.stderr)
+            return 1
+
     try:
-        version = compute_next_version(repo_root, args.base_version)
+        version = compute_next_version(repo_root, args.base_version, pending_message)
     except Exception as exc:
         print(f"Version calculation failed: {exc}", file=sys.stderr)
         return 1
