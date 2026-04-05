@@ -35,3 +35,16 @@ fi
 if command -v npx >/dev/null 2>&1 && [ -f package.json ]; then
   npx lint-staged
 fi
+
+# Re-sync after lint-staged and block commit if drift still exists.
+"$PYTHON_BIN" scripts/version_sync.py --write >/dev/null
+git add privatecrossvpn.py .github/workflows/release.yml README.md
+if [ -f mobile/pubspec.yaml ]; then
+  git add mobile/pubspec.yaml
+fi
+
+if ! "$PYTHON_BIN" scripts/version_sync.py --check >/dev/null; then
+  echo "[pre-commit] Version references are still out of sync. Commit blocked."
+  echo "Run: $PYTHON_BIN scripts/version_sync.py --write"
+  exit 1
+fi

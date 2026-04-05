@@ -49,6 +49,29 @@ if ! printf '%s' "$commit_msg" | grep -Eq "$header_pattern"; then
   fi
 fi
 
+# Auto-shorten header if AI generated a long but otherwise valid subject.
+max_header_len=100
+if [ ${#commit_msg} -gt $max_header_len ] && printf '%s' "$commit_msg" | grep -Eq "$header_pattern"; then
+  prefix="${commit_msg%%: *}: "
+  subject="${commit_msg#*: }"
+  available=$((max_header_len - ${#prefix}))
+  if [ $available -lt 1 ]; then
+    available=1
+  fi
+
+  trimmed_subject=$(printf '%s' "$subject" | cut -c1-"$available" | sed 's/[[:space:]]*$//')
+  if [ -z "$trimmed_subject" ]; then
+    trimmed_subject="update changes"
+  fi
+
+  {
+    printf '%s%s\n' "$prefix" "$trimmed_subject"
+    tail -n +2 "$commit_msg_file" || true
+  } > "$commit_msg_file.tmp"
+  mv "$commit_msg_file.tmp" "$commit_msg_file"
+  commit_msg=$(head -n 1 "$commit_msg_file")
+fi
+
 if ! printf '%s' "$commit_msg" | grep -Eq "$header_pattern"; then
   cat <<'EOF'
 Invalid commit header format.

@@ -53,7 +53,7 @@ Releases are produced automatically from `main` and published with prebuilt arti
 
 ```
 +---------------------------+-------------------------------------------+
-|  PrivateCrossVPN v1.2.3   |  Status & Location                        |
+|  PrivateCrossVPN v1.3.0   |  Status & Location                        |
 |                           |  ● Connected           Uptime: 00:14:32   |
 |  Saved Profiles           |  IP: 185.xxx.xxx.xx    Kill-Switch: ON    |
 |  [my-wireguard      ][X] |  Location: Frankfurt, Hesse, DE           |
