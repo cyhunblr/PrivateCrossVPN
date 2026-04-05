@@ -42,7 +42,7 @@ jobs:
 
           latest_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)
           if [[ -z "$latest_tag" ]]; then
-            base_version="1.2.1"
+            base_version="1.2.2"
             log_range="HEAD"
           else
             base_version="${latest_tag#v}"

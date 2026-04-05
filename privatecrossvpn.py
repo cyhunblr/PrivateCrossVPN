@@ -50,7 +50,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 APP_NAME = "PrivateCrossVPN"
-APP_VERSION = os.environ.get("PVCVPN_VERSION", "1.2.1")
+APP_VERSION = os.environ.get("PVCVPN_VERSION", "1.2.2")
 LOG_DATE_FMT = "%Y-%m-%d %H:%M:%S"
 IP_API_URL = "https://ipinfo.io/json"
 IP_API_TIMEOUT = 8  # seconds
