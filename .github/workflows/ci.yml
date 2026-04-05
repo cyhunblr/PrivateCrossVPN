@@ -38,10 +38,15 @@ jobs:
         run: |
           python scripts/version_sync.py --check
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Lint Markdown
         run: |
-          npm install -g markdownlint-cli
-          markdownlint "*.md" "docs/*.md" --config .markdownlint.json
+          npm install markdownlint-cli
+          ./node_modules/.bin/markdownlint "*.md" "docs/*.md" --config .markdownlint.json
 
       - name: Lint
         run: |
