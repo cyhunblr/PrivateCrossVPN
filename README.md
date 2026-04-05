@@ -125,7 +125,24 @@ To enable the local commit hook:
 ```bash
 git config core.hooksPath .githooks
 chmod +x .githooks/commit-msg
+chmod +x .githooks/post-commit
 ```
+
+## Version Sync
+
+Release versioning is calculated from commit history (Conventional Commits). To keep version references aligned after local commits:
+
+```bash
+python scripts/version_sync.py --write
+```
+
+Quick check only:
+
+```bash
+python scripts/version_sync.py --check
+```
+
+When `.githooks/post-commit` is enabled, you'll get a reminder automatically if version fields drift.
 
 ---
 

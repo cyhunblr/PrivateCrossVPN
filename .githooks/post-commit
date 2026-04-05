@@ -1,0 +1,19 @@
+#!/bin/sh
+
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+else
+  exit 0
+fi
+
+if "$PYTHON_BIN" scripts/version_sync.py --check >/dev/null 2>&1; then
+  exit 0
+fi
+
+cat <<'EOF'
+[post-commit] Version references may be out of sync.
+Run this command to update tracked version fields:
+  python scripts/version_sync.py --write
+EOF
