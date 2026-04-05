@@ -33,8 +33,9 @@ class VpnService {
   // -------------------------------------------------------------------------
 
   Future<void> connect(ConnectionProfile profile) async {
-    if (_state == TunnelState.connected || _state == TunnelState.connecting)
+    if (_state == TunnelState.connected || _state == TunnelState.connecting) {
       return;
+    }
     _setState(TunnelState.connecting);
     _activeProfile = profile;
     try {

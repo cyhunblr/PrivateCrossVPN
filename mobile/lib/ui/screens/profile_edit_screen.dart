@@ -57,7 +57,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   Future<void> _load() async {
     if (widget.profileName != null) {
       final p = await ProfileManager.instance.loadProfile(widget.profileName!);
-      if (p != null) _populate(p);
+      if (p != null) {
+        _populate(p);
+      }
     }
     setState(() => _loading = false);
   }
@@ -102,8 +104,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   ConnectionProfile? _build() {
     switch (_protocol) {
       case Protocol.wireguard:
-        if (_wgName.text.isEmpty || _wgPrivKey.text.isEmpty ||
-            _wgPubKey.text.isEmpty || _wgEndpoint.text.isEmpty) return null;
+        if (_wgName.text.isEmpty ||
+            _wgPrivKey.text.isEmpty ||
+            _wgPubKey.text.isEmpty ||
+            _wgEndpoint.text.isEmpty) {
+          return null;
+        }
         return WireGuardProfile(
           name: _wgName.text,
           privateKey: _wgPrivKey.text,
@@ -116,7 +122,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
           keepalive: _wgKeepalive.text,
         );
       case Protocol.openVPN:
-        if (_ovpnName.text.isEmpty || _ovpnRemote.text.isEmpty) return null;
+        if (_ovpnName.text.isEmpty || _ovpnRemote.text.isEmpty) {
+          return null;
+        }
         return OpenVPNProfile(
           name: _ovpnName.text,
           remote: _ovpnRemote.text,
@@ -128,7 +136,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
           extra: _ovpnExtra.text,
         );
       case Protocol.sshSocks5:
-        if (_sshName.text.isEmpty || _sshHost.text.isEmpty) return null;
+        if (_sshName.text.isEmpty || _sshHost.text.isEmpty) {
+          return null;
+        }
         return SSHProfile(
           name: _sshName.text,
           host: _sshHost.text,
@@ -149,16 +159,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       return;
     }
     await ProfileManager.instance.saveProfile(profile);
-    if (mounted) context.pop();
+    if (mounted) {
+      context.pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.profileName == null ? 'New Profile' : 'Edit Profile'),
+        title:
+            Text(widget.profileName == null ? 'New Profile' : 'Edit Profile'),
         actions: [
           TextButton(onPressed: _save, child: const Text('Save')),
         ],
@@ -176,18 +191,33 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         controller: _tabs,
         children: [
           _WireGuardForm(
-            name: _wgName, privateKey: _wgPrivKey, address: _wgAddress,
-            dns: _wgDns, publicKey: _wgPubKey, psk: _wgPsk,
-            endpoint: _wgEndpoint, allowedIps: _wgAllowedIps, keepalive: _wgKeepalive,
+            name: _wgName,
+            privateKey: _wgPrivKey,
+            address: _wgAddress,
+            dns: _wgDns,
+            publicKey: _wgPubKey,
+            psk: _wgPsk,
+            endpoint: _wgEndpoint,
+            allowedIps: _wgAllowedIps,
+            keepalive: _wgKeepalive,
           ),
           _OpenVPNForm(
-            name: _ovpnName, remote: _ovpnRemote, port: _ovpnPort,
-            proto: _ovpnProto, cipher: _ovpnCipher, auth: _ovpnAuth,
-            ca: _ovpnCa, extra: _ovpnExtra,
+            name: _ovpnName,
+            remote: _ovpnRemote,
+            port: _ovpnPort,
+            proto: _ovpnProto,
+            cipher: _ovpnCipher,
+            auth: _ovpnAuth,
+            ca: _ovpnCa,
+            extra: _ovpnExtra,
           ),
           _SSHForm(
-            name: _sshName, host: _sshHost, port: _sshPort,
-            user: _sshUser, socksPort: _socksPort, keyPath: _sshKeyPath,
+            name: _sshName,
+            host: _sshHost,
+            port: _sshPort,
+            user: _sshUser,
+            socksPort: _socksPort,
+            keyPath: _sshKeyPath,
           ),
         ],
       ),
@@ -198,11 +228,29 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   void dispose() {
     _tabs.dispose();
     for (final c in [
-      _wgName, _wgPrivKey, _wgAddress, _wgDns, _wgPubKey, _wgPsk,
-      _wgEndpoint, _wgAllowedIps, _wgKeepalive,
-      _ovpnName, _ovpnRemote, _ovpnPort, _ovpnProto, _ovpnCipher,
-      _ovpnAuth, _ovpnCa, _ovpnExtra,
-      _sshName, _sshHost, _sshPort, _sshUser, _socksPort, _sshKeyPath,
+      _wgName,
+      _wgPrivKey,
+      _wgAddress,
+      _wgDns,
+      _wgPubKey,
+      _wgPsk,
+      _wgEndpoint,
+      _wgAllowedIps,
+      _wgKeepalive,
+      _ovpnName,
+      _ovpnRemote,
+      _ovpnPort,
+      _ovpnProto,
+      _ovpnCipher,
+      _ovpnAuth,
+      _ovpnCa,
+      _ovpnExtra,
+      _sshName,
+      _sshHost,
+      _sshPort,
+      _sshUser,
+      _socksPort,
+      _sshKeyPath,
     ]) {
       c.dispose();
     }
@@ -214,68 +262,107 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
 // Form widgets
 
 class _WireGuardForm extends StatelessWidget {
-  final TextEditingController name, privateKey, address, dns, publicKey,
-      psk, endpoint, allowedIps, keepalive;
+  final TextEditingController name,
+      privateKey,
+      address,
+      dns,
+      publicKey,
+      psk,
+      endpoint,
+      allowedIps,
+      keepalive;
 
   const _WireGuardForm({
-    required this.name, required this.privateKey, required this.address,
-    required this.dns, required this.publicKey, required this.psk,
-    required this.endpoint, required this.allowedIps, required this.keepalive,
+    required this.name,
+    required this.privateKey,
+    required this.address,
+    required this.dns,
+    required this.publicKey,
+    required this.psk,
+    required this.endpoint,
+    required this.allowedIps,
+    required this.keepalive,
   });
 
   @override
   Widget build(BuildContext context) => _FormScroll(children: [
-    _Field(label: 'Profile Name *', ctrl: name),
-    _Field(label: 'Private Key *', ctrl: privateKey, obscure: true),
-    _Field(label: 'Address *', ctrl: address, hint: '10.0.0.2/24'),
-    _Field(label: 'DNS', ctrl: dns, hint: '1.1.1.1'),
-    _Field(label: 'Server Public Key *', ctrl: publicKey),
-    _Field(label: 'Preshared Key', ctrl: psk, obscure: true),
-    _Field(label: 'Endpoint *', ctrl: endpoint, hint: 'vpn.example.com:51820'),
-    _Field(label: 'Allowed IPs', ctrl: allowedIps),
-    _Field(label: 'Persistent Keepalive (s)', ctrl: keepalive, keyboard: TextInputType.number),
-  ]);
+        _Field(label: 'Profile Name *', ctrl: name),
+        _Field(label: 'Private Key *', ctrl: privateKey, obscure: true),
+        _Field(label: 'Address *', ctrl: address, hint: '10.0.0.2/24'),
+        _Field(label: 'DNS', ctrl: dns, hint: '1.1.1.1'),
+        _Field(label: 'Server Public Key *', ctrl: publicKey),
+        _Field(label: 'Preshared Key', ctrl: psk, obscure: true),
+        _Field(
+            label: 'Endpoint *', ctrl: endpoint, hint: 'vpn.example.com:51820'),
+        _Field(label: 'Allowed IPs', ctrl: allowedIps),
+        _Field(
+            label: 'Persistent Keepalive (s)',
+            ctrl: keepalive,
+            keyboard: TextInputType.number),
+      ]);
 }
 
 class _OpenVPNForm extends StatelessWidget {
-  final TextEditingController name, remote, port, proto, cipher, auth, ca, extra;
+  final TextEditingController name,
+      remote,
+      port,
+      proto,
+      cipher,
+      auth,
+      ca,
+      extra;
 
   const _OpenVPNForm({
-    required this.name, required this.remote, required this.port,
-    required this.proto, required this.cipher, required this.auth,
-    required this.ca, required this.extra,
+    required this.name,
+    required this.remote,
+    required this.port,
+    required this.proto,
+    required this.cipher,
+    required this.auth,
+    required this.ca,
+    required this.extra,
   });
 
   @override
   Widget build(BuildContext context) => _FormScroll(children: [
-    _Field(label: 'Profile Name *', ctrl: name),
-    _Field(label: 'Remote Host *', ctrl: remote),
-    _Field(label: 'Port', ctrl: port, keyboard: TextInputType.number),
-    _Field(label: 'Protocol (udp/tcp)', ctrl: proto),
-    _Field(label: 'Cipher', ctrl: cipher),
-    _Field(label: 'Auth', ctrl: auth),
-    _Field(label: 'CA Certificate', ctrl: ca, maxLines: 5),
-    _Field(label: 'Extra directives', ctrl: extra, maxLines: 5),
-  ]);
+        _Field(label: 'Profile Name *', ctrl: name),
+        _Field(label: 'Remote Host *', ctrl: remote),
+        _Field(label: 'Port', ctrl: port, keyboard: TextInputType.number),
+        _Field(label: 'Protocol (udp/tcp)', ctrl: proto),
+        _Field(label: 'Cipher', ctrl: cipher),
+        _Field(label: 'Auth', ctrl: auth),
+        _Field(label: 'CA Certificate', ctrl: ca, maxLines: 5),
+        _Field(label: 'Extra directives', ctrl: extra, maxLines: 5),
+      ]);
 }
 
 class _SSHForm extends StatelessWidget {
   final TextEditingController name, host, port, user, socksPort, keyPath;
 
   const _SSHForm({
-    required this.name, required this.host, required this.port,
-    required this.user, required this.socksPort, required this.keyPath,
+    required this.name,
+    required this.host,
+    required this.port,
+    required this.user,
+    required this.socksPort,
+    required this.keyPath,
   });
 
   @override
   Widget build(BuildContext context) => _FormScroll(children: [
-    _Field(label: 'Profile Name *', ctrl: name),
-    _Field(label: 'SSH Host *', ctrl: host),
-    _Field(label: 'SSH Port', ctrl: port, keyboard: TextInputType.number),
-    _Field(label: 'User', ctrl: user),
-    _Field(label: 'SOCKS5 Local Port', ctrl: socksPort, keyboard: TextInputType.number),
-    _Field(label: 'Private Key Path', ctrl: keyPath, hint: '/path/to/id_ed25519'),
-  ]);
+        _Field(label: 'Profile Name *', ctrl: name),
+        _Field(label: 'SSH Host *', ctrl: host),
+        _Field(label: 'SSH Port', ctrl: port, keyboard: TextInputType.number),
+        _Field(label: 'User', ctrl: user),
+        _Field(
+            label: 'SOCKS5 Local Port',
+            ctrl: socksPort,
+            keyboard: TextInputType.number),
+        _Field(
+            label: 'Private Key Path',
+            ctrl: keyPath,
+            hint: '/path/to/id_ed25519'),
+      ]);
 }
 
 class _FormScroll extends StatelessWidget {
@@ -286,10 +373,12 @@ class _FormScroll extends StatelessWidget {
   Widget build(BuildContext context) => SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          children: children.map((w) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: w,
-          )).toList(),
+          children: children
+              .map((w) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: w,
+                  ))
+              .toList(),
         ),
       );
 }

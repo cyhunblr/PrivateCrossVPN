@@ -19,7 +19,9 @@ class ReconnectManager {
   ReconnectManager(this._vpn);
 
   void start() {
-    if (_running) return;
+    if (_running) {
+      return;
+    }
     _running = true;
     _retries = 0;
     _timer = Timer.periodic(_heartbeat, (_) => _tick());
@@ -33,8 +35,12 @@ class ReconnectManager {
   }
 
   Future<void> _tick() async {
-    if (!_running) return;
-    if (_vpn.state != TunnelState.connected) return;
+    if (!_running) {
+      return;
+    }
+    if (_vpn.state != TunnelState.connected) {
+      return;
+    }
 
     // Re-check state after a brief pause to avoid race conditions
     await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -54,7 +60,9 @@ class ReconnectManager {
     await Future<void>.delayed(delay);
 
     final profile = _vpn.activeProfile;
-    if (profile == null || !_running) return;
+    if (profile == null || !_running) {
+      return;
+    }
 
     try {
       await _vpn.connect(profile);
