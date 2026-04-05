@@ -119,7 +119,7 @@ chmod +x .githooks/commit-msg
 - **Linux**: x64 distro with compatible glibc for the selected release artifact (`ubuntu-20.04`, `ubuntu-22.04`, or `ubuntu-24.04` build)
 - **Windows**: choose the closest GitHub-hosted build artifact (`windows-2022` or `windows-latest`)
 
-CI/CD note: Release builds publish a matrix of Linux and Windows artifacts. Linux includes one self-hosted `ubuntu-20.04` build plus GitHub-hosted `ubuntu-22.04` and `ubuntu-24.04` builds. Windows artifacts are built on GitHub-hosted Windows Server runners (`windows-2022` and `windows-latest`), not desktop Win10/Win11 hosts.
+CI/CD note: CI runs on your self-hosted Linux x64 runner. Release builds publish a matrix of Linux and Windows artifacts. Linux includes one self-hosted `ubuntu-20.04` build plus GitHub-hosted `ubuntu-22.04` and `ubuntu-24.04` builds. Windows artifacts are built on GitHub-hosted Windows Server runners (`windows-2022` and `windows-latest`), not desktop Win10/Win11 hosts.
 
 ### Python
 

@@ -133,15 +133,9 @@ sudo ./dist/PrivateCrossVPN
 - **Markdown lint**: CI also runs `markdownlint-cli` against `README.md`, `BUILD.md`, and the docs under `docs/`.
 - **Local dev checks**: `pip install -r requirements-dev.txt` then run `ruff check .` and `pytest -q`.
 
-### Hybrid CI with Self-Hosted Runner
+### CI on Self-Hosted Runner
 
-The CI workflow supports both GitHub-hosted and self-hosted Linux runners.
-
-**How routing works:**
-
-- `CI_RUNNER_MODE=self-hosted` (repository variable): push/PR jobs run on self-hosted.
-- `CI_RUNNER_MODE=github` or unset: push/PR jobs run on GitHub-hosted Ubuntu.
-- Manual runs (`workflow_dispatch`) can override routing with `runner_target` (`auto`, `github`, `self-hosted`).
+The CI workflow is configured to run on a self-hosted Linux x64 runner (`runs-on: [self-hosted, linux, x64]`).
 
 **Set up a self-hosted Linux runner (one-time):**
 
@@ -176,14 +170,6 @@ sudo ./svc.sh status
 
 Runner logs are at `~/actions-runner/_diag/`.
 
-**Enable self-hosted by default for this repo:**
-
-1. `Settings` → `Secrets and variables` → `Actions` → `Variables`
-2. Add a new repository variable with Name `CI_RUNNER_MODE` and Value `self-hosted`.
-3. Next push will automatically use your self-hosted runner.
-
-**Switch back to GitHub-hosted:**
-
-- Set `CI_RUNNER_MODE=github` or delete the variable.
+No repository variable is required for CI runner routing.
 
 **Note on tokens:** The configuration token from GitHub's setup page is valid for a limited time. If setup takes longer or the token expires, regenerate it in `Settings` → `Actions` → `Runners` and run `./config.sh` again.

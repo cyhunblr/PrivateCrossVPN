@@ -6,62 +6,13 @@ on:
     branches:
       - "**"
   workflow_dispatch:
-    inputs:
-      runner_target:
-        description: "Runner target (auto uses repository variable CI_RUNNER_MODE)"
-        required: false
-        default: auto
-        type: choice
-        options:
-          - auto
-          - github
-          - self-hosted
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint-and-test-github:
-    if: >
-      (github.event_name != 'workflow_dispatch' && vars.CI_RUNNER_MODE != 'self-hosted') ||
-      (github.event_name == 'workflow_dispatch' &&
-        (inputs.runner_target == 'github' ||
-         (inputs.runner_target == 'auto' && vars.CI_RUNNER_MODE != 'self-hosted')))
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Lint Markdown
-        run: |
-          npx -y markdownlint-cli "*.md" "docs/*.md" --config .markdownlint.json
-
-      - name: Lint
-        run: |
-          python -m ruff check .
-
-      - name: Test
-        run: |
-          python -m pytest -q
-
-  lint-and-test-self-hosted:
-    if: >
-      (github.event_name != 'workflow_dispatch' && vars.CI_RUNNER_MODE == 'self-hosted') ||
-      (github.event_name == 'workflow_dispatch' &&
-        (inputs.runner_target == 'self-hosted' ||
-         (inputs.runner_target == 'auto' && vars.CI_RUNNER_MODE == 'self-hosted')))
+  lint-and-test:
     runs-on:
       - self-hosted
       - linux
