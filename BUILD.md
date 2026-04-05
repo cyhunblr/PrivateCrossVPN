@@ -9,7 +9,7 @@
 
 ### System Binaries (must be pre-installed by the user)
 
-| Protocol   | Linux (Ubuntu 20.04/22.04)         | Windows 11                              |
+| Protocol   | Linux (Ubuntu 20.04)               | Windows 11                              |
 |------------|------------------------------------|-----------------------------------------|
 | WireGuard  | `sudo apt install wireguard`       | <https://www.wireguard.com/install/>      |
 | OpenVPN    | `sudo apt install openvpn`         | <https://openvpn.net/community-downloads> |

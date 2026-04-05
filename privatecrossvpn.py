@@ -2,7 +2,7 @@
 """
 PrivateCrossVPN — A production-grade, cross-platform VPN management application.
 
-Supports WireGuard, OpenVPN, and SSH SOCKS5 tunneling on Windows 11 and Ubuntu 20.04/22.04.
+Supports WireGuard, OpenVPN, and SSH SOCKS5 tunneling on Windows 11 and Ubuntu 20.04.
 Built with CustomTkinter for a modern, intuitive UI.
 
 Author : PrivateCrossVPN Team
@@ -2513,7 +2513,7 @@ class PrivateCrossVPNApp(ctk.CTk):
 
     def _check_privileges(self) -> None:
         if self.system.os_type == OSType.UNSUPPORTED:
-            messagebox.showwarning("Unsupported OS", "Only Windows 11 and Ubuntu 20.04/22.04 are supported.")
+            messagebox.showwarning("Unsupported OS", "Only Windows 11 and Ubuntu 20.04 are supported.")
             return
         if not self.system.is_admin():
             logger.warning("Running WITHOUT elevated privileges.")
