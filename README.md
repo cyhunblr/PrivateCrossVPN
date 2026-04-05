@@ -2,8 +2,9 @@
   <img src="img/logo.png" alt="PrivateCrossVPN" width="400">
 </p>
 
+<h1 align="center">PrivateCrossVPN</h1>
+
 <p align="center" style="margin-top: 6px;">
-  <span style="font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">PrivateCrossVPN</span><br>
   <strong>Production-ready VPN client manager for self-hosted infrastructure</strong><br>
 </p>
 
