@@ -34,7 +34,7 @@ jobs:
 
       - name: Lint Markdown
         run: |
-          npx -y markdownlint-cli "*.md" "docs/*.md" --config .markdownlint.json
+          npx -y markdownlint-cli -- "*.md" "docs/*.md" --config .markdownlint.json
 
       - name: Lint
         run: |
