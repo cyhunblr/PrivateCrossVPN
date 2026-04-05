@@ -1,6 +1,12 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
+set -e
+
+if [ -x ".venv/bin/python" ]; then
+	export PATH="$(pwd)/.venv/bin:$PATH"
+fi
+
 commit_msg_file="$1"
 commit_msg=$(head -n 1 "$commit_msg_file")
 header_pattern='^(feat|fix|refactor|chore|docs|test|build|ci|perf|style|revert)(!)?: .+'
@@ -96,7 +102,11 @@ else
 fi
 
 if [ -n "$PYTHON_BIN" ]; then
-	"$PYTHON_BIN" scripts/version_sync.py --write --pending-message-file "$commit_msg_file" >/dev/null
+	if ! "$PYTHON_BIN" scripts/version_sync.py --write --pending-message-file "$commit_msg_file" >/dev/null; then
+		echo "[commit-msg] version sync failed; commit blocked."
+		echo "Run: $PYTHON_BIN scripts/version_sync.py --write"
+		exit 1
+	fi
 	git add privatecrossvpn.py .github/workflows/release.yml README.md
 	if [ -f mobile/pubspec.yaml ]; then
 		git add mobile/pubspec.yaml

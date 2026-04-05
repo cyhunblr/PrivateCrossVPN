@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+if [ -x ".venv/bin/python" ]; then
+  export PATH="$(pwd)/.venv/bin:$PATH"
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+else
+  echo "[pre-push] python not found; cannot validate version sync. Push blocked."
+  exit 1
+fi
+
+if ! "$PYTHON_BIN" scripts/version_sync.py --check >/dev/null; then
+  echo "[pre-push] Version references are out of sync. Push blocked."
+  echo "Run: $PYTHON_BIN scripts/version_sync.py --write"
+  exit 1
+fi
