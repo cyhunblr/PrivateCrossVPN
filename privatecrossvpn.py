@@ -13,8 +13,6 @@ Python : 3.10+
 from __future__ import annotations
 
 import ctypes
-import datetime
-import ipaddress
 import json
 import logging
 import os
@@ -22,20 +20,15 @@ import platform
 import queue
 import re
 import shutil
-import signal
 import socket
 import subprocess
 import sys
-import tempfile
-import textwrap
 import threading
 import time
-import traceback
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 from typing import Any, Callable, Optional
-from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 # ---------------------------------------------------------------------------
@@ -1268,13 +1261,16 @@ class PrivateCrossVPNApp(ctk.CTk):
         row = self._wizard_build_header(scroll, "Step 1: SSH Key", row)
 
         self._wiz_ssh_status = ctk.CTkLabel(scroll, text="Checking…", anchor="w")
-        self._wiz_ssh_status.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="w"); row += 1
+        self._wiz_ssh_status.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="w")
+        row += 1
 
         self._wiz_ssh_pubkey_box = ctk.CTkTextbox(scroll, height=50, state="disabled")
-        self._wiz_ssh_pubkey_box.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="ew"); row += 1
+        self._wiz_ssh_pubkey_box.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="ew")
+        row += 1
 
         ssh_btn_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        ssh_btn_row.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+        ssh_btn_row.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew")
+        row += 1
 
         self._wiz_ssh_browse_btn = ctk.CTkButton(
             ssh_btn_row, text="Use Existing Key…", width=150, command=self._wizard_browse_ssh_key)
@@ -1287,7 +1283,8 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         # Generate new key row
         ssh_gen_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        ssh_gen_row.grid(row=row, column=0, padx=8, pady=(0, 6), sticky="ew"); row += 1
+        ssh_gen_row.grid(row=row, column=0, padx=8, pady=(0, 6), sticky="ew")
+        row += 1
         ssh_gen_row.grid_columnconfigure(1, weight=1)
 
         self._wiz_ssh_gen_btn = ctk.CTkButton(
@@ -1308,13 +1305,16 @@ class PrivateCrossVPNApp(ctk.CTk):
         provider_seg = ctk.CTkSegmentedButton(
             scroll, values=["DigitalOcean", "Azure", "Other"],
             variable=self._wiz_provider_var, command=self._wizard_on_provider_change)
-        provider_seg.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+        provider_seg.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew")
+        row += 1
 
         self._wiz_provider_info = ctk.CTkTextbox(scroll, height=60, state="disabled")
-        self._wiz_provider_info.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+        self._wiz_provider_info.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew")
+        row += 1
 
         srv_frame = ctk.CTkFrame(scroll, fg_color="transparent")
-        srv_frame.grid(row=row, column=0, padx=8, pady=(2, 6), sticky="ew"); row += 1
+        srv_frame.grid(row=row, column=0, padx=8, pady=(2, 6), sticky="ew")
+        row += 1
         srv_frame.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(srv_frame, text="Server IP:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
@@ -1335,7 +1335,8 @@ class PrivateCrossVPNApp(ctk.CTk):
         row = self._wizard_build_header(scroll, "Step 3: Server Connection", row)
 
         test_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        test_row.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="ew"); row += 1
+        test_row.grid(row=row, column=0, padx=8, pady=(2, 2), sticky="ew")
+        row += 1
 
         self._wiz_test_btn = ctk.CTkButton(
             test_row, text="Test Connection", width=150, command=self._wizard_test_connection)
@@ -1345,14 +1346,17 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._wiz_test_status.pack(side="left", fill="x", expand=True)
 
         self._wiz_test_detail = ctk.CTkLabel(scroll, text="", anchor="w", font=ctk.CTkFont(size=11), wraplength=600)
-        self._wiz_test_detail.grid(row=row, column=0, padx=8, pady=(0, 4), sticky="w"); row += 1
+        self._wiz_test_detail.grid(row=row, column=0, padx=8, pady=(0, 4), sticky="w")
+        row += 1
 
         # Remote command runner
         ctk.CTkLabel(scroll, text="Run command on server:", anchor="w",
-                      font=ctk.CTkFont(size=12)).grid(row=row, column=0, padx=8, pady=(4, 2), sticky="w"); row += 1
+                      font=ctk.CTkFont(size=12)).grid(row=row, column=0, padx=8, pady=(4, 2), sticky="w")
+        row += 1
 
         cmd_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        cmd_row.grid(row=row, column=0, padx=8, pady=(0, 2), sticky="ew"); row += 1
+        cmd_row.grid(row=row, column=0, padx=8, pady=(0, 2), sticky="ew")
+        row += 1
         cmd_row.grid_columnconfigure(0, weight=1)
 
         self._wiz_remote_cmd = ctk.CTkEntry(cmd_row, placeholder_text="e.g. apt update && apt upgrade -y")
@@ -1364,7 +1368,8 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         self._wiz_remote_output = ctk.CTkTextbox(scroll, height=100, state="disabled",
             font=ctk.CTkFont(family="Consolas" if self.system.os_type == OSType.WINDOWS else "monospace", size=11))
-        self._wiz_remote_output.grid(row=row, column=0, padx=8, pady=(2, 6), sticky="ew"); row += 1
+        self._wiz_remote_output.grid(row=row, column=0, padx=8, pady=(2, 6), sticky="ew")
+        row += 1
 
         # Bind Enter key to run
         self._wiz_remote_cmd.bind("<Return>", lambda e: self._wizard_run_remote_cmd())
@@ -1376,11 +1381,13 @@ class PrivateCrossVPNApp(ctk.CTk):
         proto_seg = ctk.CTkSegmentedButton(
             scroll, values=["WireGuard", "OpenVPN", "SSH SOCKS5"],
             variable=self._wiz_proto_var, command=self._wizard_on_proto_change)
-        proto_seg.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+        proto_seg.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew")
+        row += 1
 
         # Protocol-specific frames (stacked, show/hide)
         self._wiz_proto_container = ctk.CTkFrame(scroll, fg_color="transparent")
-        self._wiz_proto_container.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew"); row += 1
+        self._wiz_proto_container.grid(row=row, column=0, padx=8, pady=(2, 4), sticky="ew")
+        row += 1
         self._wiz_proto_container.grid_columnconfigure(0, weight=1)
 
         # -- WireGuard frame --
@@ -1467,10 +1474,12 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         # ── Profile Name & Create ────────────────────────────────────────
         sep = ctk.CTkFrame(scroll, height=2, fg_color="gray40")
-        sep.grid(row=row, column=0, padx=8, pady=(8, 4), sticky="ew"); row += 1
+        sep.grid(row=row, column=0, padx=8, pady=(8, 4), sticky="ew")
+        row += 1
 
         profile_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        profile_row.grid(row=row, column=0, padx=8, pady=(4, 8), sticky="ew"); row += 1
+        profile_row.grid(row=row, column=0, padx=8, pady=(4, 8), sticky="ew")
+        row += 1
         profile_row.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(profile_row, text="Profile Name:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
@@ -1593,9 +1602,10 @@ class PrivateCrossVPNApp(ctk.CTk):
                     self.after(0, lambda: self._wiz_ssh_status.configure(
                         text=f"Generation failed: {err}", text_color="#e74c3c"))
             except Exception as exc:
+                error_message = f"Error: {exc}"
                 logger.error("ssh-keygen error: %s", exc)
                 self.after(0, lambda: self._wiz_ssh_status.configure(
-                    text=f"Error: {exc}", text_color="#e74c3c"))
+                    text=error_message, text_color="#e74c3c"))
             finally:
                 self.after(0, lambda: self._wiz_ssh_gen_btn.configure(
                     state="normal", text="Generate New Key"))
@@ -1682,11 +1692,13 @@ class PrivateCrossVPNApp(ctk.CTk):
                     self.after(0, lambda: self._wiz_test_detail.configure(text=err))
                     logger.warning("Wizard: SSH test failed — %s", err)
             except subprocess.TimeoutExpired:
+                timeout_message = "Connection timed out."
                 self.after(0, lambda: self._wiz_test_status.configure(
-                    text="Connection timed out.", text_color="#e74c3c"))
+                    text=timeout_message, text_color="#e74c3c"))
             except Exception as exc:
+                error_message = f"Error: {exc}"
                 self.after(0, lambda: self._wiz_test_status.configure(
-                    text=f"Error: {exc}", text_color="#e74c3c"))
+                    text=error_message, text_color="#e74c3c"))
             finally:
                 self.after(0, lambda: self._wiz_test_btn.configure(
                     state="normal", text="Test Connection"))
@@ -1758,7 +1770,7 @@ class PrivateCrossVPNApp(ctk.CTk):
                         stripped = line.rstrip()
                         stdout_lines.append(stripped)
                         if on_output:
-                            self.after(0, lambda l=stripped: on_output(l))
+                            self.after(0, lambda text=stripped: on_output(text))
 
                 proc.wait(timeout=timeout)
                 stderr = proc.stderr.read() if proc.stderr else ""
@@ -1772,8 +1784,9 @@ class PrivateCrossVPNApp(ctk.CTk):
                 if on_done:
                     self.after(0, lambda: on_done(-1, "", "Command timed out"))
             except Exception as exc:
+                error_message = str(exc)
                 if on_done:
-                    self.after(0, lambda: on_done(-1, "", str(exc)))
+                    self.after(0, lambda: on_done(-1, "", error_message))
 
         threading.Thread(target=_worker, daemon=True).start()
 
