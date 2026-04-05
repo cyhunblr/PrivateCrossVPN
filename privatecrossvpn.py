@@ -578,9 +578,12 @@ class SystemHandler:
         args = self._elevate_args_if_needed(args)
         logger.info("CMD> %s", " ".join(args))
         try:
+            extra: dict[str, Any] = {}
+            if self.os_type == OSType.WINDOWS:
+                extra["creationflags"] = subprocess.CREATE_NO_WINDOW
             result = subprocess.run(
                 args, shell=False, capture_output=capture,
-                text=True, timeout=timeout, check=check,
+                text=True, timeout=timeout, check=check, **extra,
             )
             if result.stdout:
                 for line in result.stdout.strip().splitlines():
@@ -612,6 +615,8 @@ class SystemHandler:
     def popen_cmd(self, args: list[str], **kwargs: Any) -> subprocess.Popen[str]:
         args = self._elevate_args_if_needed(args)
         logger.info("POPEN> %s", " ".join(args))
+        if self.os_type == OSType.WINDOWS:
+            kwargs.setdefault("creationflags", subprocess.CREATE_NO_WINDOW)
         return subprocess.Popen(
             args, shell=False, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, **kwargs,

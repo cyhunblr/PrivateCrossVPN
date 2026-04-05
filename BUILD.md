@@ -44,7 +44,7 @@ sudo python3 privatecrossvpn.py
 pip install pyinstaller
 
 # 2. Build the executable
-pyinstaller --noconfirm --onefile --windowed ^
+pyinstaller --noconfirm --onefile --windowed --uac-admin ^
     --name "PrivateCrossVPN" ^
     --add-data "path\to\customtkinter;customtkinter" ^
     --add-data "img;img" ^
@@ -55,7 +55,7 @@ pyinstaller --noconfirm --onefile --windowed ^
 #   python -c "import customtkinter; print(customtkinter.__path__[0])"
 #
 # Example (adjust to your system):
-# pyinstaller --noconfirm --onefile --windowed ^
+# pyinstaller --noconfirm --onefile --windowed --uac-admin ^
 #     --name "PrivateCrossVPN" ^
 #     --add-data "C:\Python311\Lib\site-packages\customtkinter;customtkinter" ^
 #     --add-data "img;img" ^
@@ -65,7 +65,7 @@ pyinstaller --noconfirm --onefile --windowed ^
 
 The resulting `.exe` will be in the `dist/` folder.
 
-**Important**: The .exe must be run as **Administrator** (right-click → Run as administrator) for VPN and firewall operations to work.
+**Important**: The `--uac-admin` flag embeds a manifest that automatically requests Administrator privileges via UAC when the .exe is launched.
 
 ---
 

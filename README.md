@@ -11,8 +11,8 @@
 <p align="center">
   <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/release.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/release.yml/badge.svg" alt="Release"></a>
-  <a href="https://github.com/cyhunblr/PrivateCrossVPN/releases"><img src="https://img.shields.io/github/v/release/cyhunblr/PrivateCrossVPN?sort=semver" alt="Latest Release"></a>
-  <a href="https://github.com/cyhunblr/PrivateCrossVPN/blob/main/LICENSE"><img src="https://img.shields.io/github/license/cyhunblr/PrivateCrossVPN" alt="License"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/releases"><img src="https://img.shields.io/badge/release-v1.2.1-blue" alt="Latest Release"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
 </p>
 
 ---
@@ -50,29 +50,29 @@ Releases are produced automatically from `main` and published with prebuilt arti
 ## Screenshots
 
 ```
-+---------------------------+------------------------------------------+
-|  PrivateCrossVPN v1.2.1   |  Status & Location                       |
-|                           |  ● Connected          Uptime: 00:14:32   |
-|  Saved Profiles           |  IP: 185.xxx.xxx.xx   Kill-Switch: ON    |
-|  [my-wireguard     ][X]  |  Location: Frankfurt, Hesse, DE           |
-|                           |  ISP: DigitalOcean LLC                   |
-|  Protocol                 |                                          |
-|  [WireGuard         v]   |  +--------------------------------------+ |
-|                           |  | WireGuard | OpenVPN | SSH SOCKS5    | |
-|  [Import from File...]    |  | Profile Name: [my-wireguard       ] | |
-|                           |  | Private Key:  [*********************] | |
++---------------------------+-------------------------------------------+
+|  PrivateCrossVPN v1.2.1   |  Status & Location                        |
+|                           |  ● Connected           Uptime: 00:14:32   |
+|  Saved Profiles           |  IP: 185.xxx.xxx.xx    Kill-Switch: ON    |
+|  [my-wireguard      ][X] |  Location: Frankfurt, Hesse, DE           |
+|                           |  ISP: DigitalOcean LLC                    |
+|  Protocol                 |                                           |
+|  [WireGuard          v]  |  +---------------------------------------+ |
+|                           |  | WireGuard | OpenVPN | SSH SOCKS5     | |
+|  [Import from File...]    |  | Profile Name: [my-wireguard        ] | |
+|                           |  | Private Key:  [********************] | |
 |  [x] Kill-Switch          |  | Address:      [10.0.0.2/24         ] | |
 |                           |  | DNS:          [1.1.1.1             ] | |
 |  Configs Folder           |  | Peer Key:     [abc123...           ] | |
 |  ~/.privatecrossvpn/...   |  | Endpoint:     [vpn.example.com:518 ] | |
 |  [Change...]              |  | Allowed IPs:  [0.0.0.0/0, ::/0    ] | |
-|                           |  |          [Save Profile]               | |
-|  Theme                    |  +--------------------------------------+ |
-|  [Dark               v]  |                                          |
-|                           |  Activity Log                    [Clear] |
-|  [      Connect      ]   |  2026-04-04 17:05:02 [INFO] WireGuard.. |
-|  [    Disconnect      ]   |  2026-04-04 17:05:03 [INFO] Connected.  |
-+---------------------------+------------------------------------------+
+|                           |  |           [Save Profile]              | |
+|  Theme                    |  +---------------------------------------+ |
+|  [Dark               v]  |                                           |
+|                           |  Activity Log                     [Clear] |
+|  [      Connect       ]  |  2026-04-04 17:05:02 [INFO] WireGuard..  |
+|  [     Disconnect     ]  |  2026-04-04 17:05:03 [INFO] Connected.   |
++---------------------------+-------------------------------------------+
 ```
 
 ---

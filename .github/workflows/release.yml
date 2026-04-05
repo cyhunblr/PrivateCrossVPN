@@ -127,7 +127,7 @@ jobs:
         shell: pwsh
         run: |
           $ctkPath = python -c "import customtkinter, pathlib; print(pathlib.Path(customtkinter.__path__[0]))"
-          python -m PyInstaller --noconfirm --onefile --windowed `
+          python -m PyInstaller --noconfirm --onefile --windowed --uac-admin `
             --name "PrivateCrossVPN-$env:PVCVPN_VERSION-${{ matrix.runner }}" `
             --add-data "$ctkPath;customtkinter" `
             --add-data "img;img" `
@@ -135,6 +135,23 @@ jobs:
             privatecrossvpn.py
           New-Item -ItemType Directory -Force release-assets | Out-Null
           Copy-Item "dist\PrivateCrossVPN-$env:PVCVPN_VERSION-${{ matrix.runner }}.exe" "release-assets\$env:ARTIFACT_NAME"
+
+      - name: Sign Windows executable
+        if: env.SIGNING_CERT != ''
+        env:
+          SIGNING_CERT: ${{ secrets.WIN_SIGNING_CERT_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.WIN_SIGNING_PASSWORD }}
+        shell: pwsh
+        run: |
+          $certBytes = [Convert]::FromBase64String($env:SIGNING_CERT)
+          $certPath = "cert.pfx"
+          [IO.File]::WriteAllBytes($certPath, $certBytes)
+          $exePath = "release-assets\$env:ARTIFACT_NAME"
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign `
+            /f $certPath /p $env:SIGNING_PASSWORD `
+            /tr http://timestamp.digicert.com /td sha256 /fd sha256 `
+            /d "PrivateCrossVPN" $exePath
+          Remove-Item $certPath
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
