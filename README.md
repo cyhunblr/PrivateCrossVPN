@@ -112,10 +112,12 @@ chmod +x .githooks/commit-msg
 ## System Requirements
 
 ### Platform
+
 - **Linux**: Ubuntu 20.04 / 22.04 (or any Debian-based distro)
 - **Windows**: Windows 11 (Windows 10 should also work)
 
 ### Python
+
 - Python **3.10+**
 - `customtkinter >= 5.2.0`
 
@@ -128,6 +130,7 @@ chmod +x .githooks/commit-msg
 | SSH SOCKS5 | `ssh` (pre-installed) | OpenSSH (built into Windows 11) |
 
 ### Kill-Switch
+
 - **Linux**: `iptables` (pre-installed on Ubuntu)
 - **Windows**: `netsh` (built-in)
 
@@ -212,6 +215,7 @@ A lightweight alternative — no VPN software needed on the client. Creates a lo
 After connecting, configure your browser to use **SOCKS5 proxy** at `127.0.0.1:1080`.
 
 **Browser Setup:**
+
 - **Firefox**: Settings -> Network Settings -> Manual proxy -> SOCKS Host: `127.0.0.1`, Port: `1080`, SOCKS v5
 - **Chrome**: Launch with `--proxy-server="socks5://127.0.0.1:1080"`
 - **System-wide (Linux)**: `export ALL_PROXY=socks5://127.0.0.1:1080`
@@ -221,6 +225,7 @@ After connecting, configure your browser to use **SOCKS5 proxy** at `127.0.0.1:1
 ## Kill-Switch
 
 When enabled, the kill-switch blocks **all** outbound traffic except:
+
 - Traffic to the VPN server itself
 - Loopback (127.0.0.0/8)
 - LAN subnets (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)

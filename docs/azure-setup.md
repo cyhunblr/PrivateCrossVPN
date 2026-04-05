@@ -47,8 +47,6 @@ Click **Create a resource** → **Virtual machine** → **Azure virtual machine*
 | **VM architecture** | `x64` | **Not** Arm64 |
 | **Size** | **Standard_B1s** (1 vCPU, 1 GB) | Click "See all sizes", search for `B1s`. This is the cheapest option and more than enough for a personal VPN |
 
-> **Important**: The portal defaults to `Standard_D2s_v3` (2 vCPU, 8 GB) at ~$78/month. This is overkill for a VPN. Always switch to **B1s** (~$7.59/month) or **B1ls** (~$3.80/month).
-
 > **Azure for Students** gives you $100 credit. With B1s, that lasts ~13 months.
 
 #### Administrator account
@@ -256,6 +254,7 @@ sudo sysctl -p
 3. **Enable IP forwarding** → set to `Enabled` → **Save**
 
 Or via CLI:
+
 ```bash
 az network nic update \
     --resource-group vpn-rg \
@@ -297,6 +296,7 @@ sudo ./openvpn-install.sh
 ```
 
 Follow the prompts (defaults are fine):
+
 - **IP address**: auto-detected
 - **Protocol**: UDP
 - **Port**: 1194
@@ -392,11 +392,13 @@ sudo -E python3 privatecrossvpn.py
 ### Cost-Saving Tips
 
 **Auto-shutdown** (most effective):
+
 - Enable during VM creation in the Management tab
 - Or: VM → **Auto-shutdown** → set a time (e.g., 2:00 AM)
 - Manually start the VM when you need it
 
 **Deallocate when idle**:
+
 - Stopping a VM from the portal is not enough — you must **deallocate** to stop compute charges
 - Disk charges continue (~$1.50/month for 30 GB Standard SSD)
 
@@ -443,7 +445,9 @@ az network public-ip update \
 - **Regular updates**: Run `sudo apt update && sudo apt upgrade -y` monthly
 
 - **Clean up completely**: When you're done, delete the entire resource group to avoid residual charges:
+
   ```bash
   az group delete --name vpn-rg --yes --no-wait
   ```
+
   This deletes the VM, disk, IP, NSG, and VNet — no more charges.

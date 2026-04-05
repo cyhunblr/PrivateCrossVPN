@@ -3,17 +3,20 @@
 ## Prerequisites
 
 ### Python
+
 - Python **3.10+** is required.
 - Install dependencies: `pip install -r requirements.txt`
 
 ### System Binaries (must be pre-installed by the user)
+
 | Protocol   | Linux (Ubuntu 20.04/22.04)         | Windows 11                              |
 |------------|------------------------------------|-----------------------------------------|
-| WireGuard  | `sudo apt install wireguard`       | https://www.wireguard.com/install/      |
-| OpenVPN    | `sudo apt install openvpn`         | https://openvpn.net/community-downloads |
+| WireGuard  | `sudo apt install wireguard`       | <https://www.wireguard.com/install/>      |
+| OpenVPN    | `sudo apt install openvpn`         | <https://openvpn.net/community-downloads> |
 | SSH SOCKS5 | `ssh` (pre-installed on Ubuntu)    | OpenSSH (built into Windows 11)         |
 
 ### Kill-Switch Dependencies
+
 - **Linux**: `iptables` (pre-installed on Ubuntu)
 - **Windows**: `netsh` (built-in)
 
@@ -87,6 +90,7 @@ python3 -m nuitka \
 ```
 
 **Alternative with PyInstaller on Linux:**
+
 ```bash
 pip install pyinstaller
 CUSTOMTKINTER_PATH=$(python3 -c "import customtkinter; print(customtkinter.__path__[0])")
@@ -99,6 +103,7 @@ pyinstaller --noconfirm --onefile --windowed \
 ```
 
 Run the resulting binary with `sudo`:
+
 ```bash
 sudo ./dist/PrivateCrossVPN
 ```
@@ -118,6 +123,6 @@ sudo ./dist/PrivateCrossVPN
 ## CI/CD
 
 - **CI**: `.github/workflows/ci.yml` runs `ruff check .` and `pytest -q` on pull requests and pushes to `main`.
-- **Release**: `.github/workflows/release.yml` bumps the patch version automatically on `main`, builds Windows and Ubuntu 20.04 executables, creates a `v*` tag, and publishes the GitHub Release.
+- **Release**: `.github/workflows/release.yml` runs only after the CI workflow succeeds on `main`, bumps the patch version automatically, builds Windows and Ubuntu 20.04 executables, creates a `v*` tag, and publishes the GitHub Release.
 - **Markdown lint**: CI also runs `markdownlint-cli` against `README.md`, `BUILD.md`, and the docs under `docs/`.
 - **Local dev checks**: `pip install -r requirements-dev.txt` then run `ruff check .` and `pytest -q`.

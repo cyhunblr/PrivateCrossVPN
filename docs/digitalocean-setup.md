@@ -30,8 +30,8 @@ Set up your own WireGuard or OpenVPN server on a DigitalOcean Droplet, then conn
 | Authentication | **SSH Key** (recommended) or Password |
 | Hostname | `vpn-server` (or anything you like) |
 
-4. Click **Create Droplet**
-5. Note the **public IPv4 address** (e.g., `164.90.xxx.xxx`)
+1. Click **Create Droplet**
+2. Note the **public IPv4 address** (e.g., `164.90.xxx.xxx`)
 
 ### SSH Key Setup (before creating the Droplet)
 
@@ -226,6 +226,7 @@ chmod +x openvpn-install.sh
 ```
 
 Follow the interactive prompts:
+
 - **IP address**: auto-detected (your Droplet IP)
 - **Protocol**: UDP (recommended)
 - **Port**: 1194 (default)

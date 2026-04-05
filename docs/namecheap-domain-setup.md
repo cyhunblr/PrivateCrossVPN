@@ -42,8 +42,8 @@ Point a custom domain (e.g., `vpn.yourdomain.tech`) to your VPN server. This mak
 | `.com` | ~$9-12/year | Classic, but more expensive |
 | `.net` | ~$10-13/year | Alternative classic |
 
-4. Add to cart and complete purchase
-5. During registration:
+1. Add to cart and complete purchase
+2. During registration:
    - **WhoisGuard**: Enable (free on Namecheap) — hides your personal info from WHOIS lookups
    - **Auto-renew**: Enable if you want to keep the domain
 
@@ -206,6 +206,7 @@ The `.tech` TLD is managed by Radix and is popular for technology projects.
 | Renewal | $35 - $50/year |
 
 > **Important**: `.tech` renewal prices are significantly higher than the first-year price. Budget accordingly or consider:
+>
 > - Transferring to a registrar with lower renewal pricing
 > - Using a cheaper TLD (`.xyz` renews at ~$10/year)
 > - Checking Namecheap coupons at renewal time
