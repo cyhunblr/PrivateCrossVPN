@@ -36,7 +36,7 @@ Releases are now created automatically from `main`. Each successful push bumps t
 
 ```
 +---------------------------+------------------------------------------+
-|  PrivateCrossVPN v1.1.0   |  Status & Location                       |
+|  PrivateCrossVPN v1.1.5   |  Status & Location                       |
 |                           |  ● Connected          Uptime: 00:14:32   |
 |  Saved Profiles           |  IP: 185.xxx.xxx.xx   Kill-Switch: ON    |
 |  [my-wireguard     ][X]  |  Location: Frankfurt, Hesse, DE          |

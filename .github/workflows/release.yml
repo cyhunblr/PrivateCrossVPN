@@ -42,7 +42,7 @@ jobs:
 
           latest_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)
           if [[ -z "$latest_tag" ]]; then
-            base_version="1.1.0"
+            base_version="1.1.5"
           else
             base_version="${latest_tag#v}"
           fi
@@ -77,9 +77,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: windows-2022
-            artifact_id: windows-binary-windows-2022
-            artifact_name: PrivateCrossVPN-windows-2022.exe
           - runner: windows-latest
             artifact_id: windows-binary-windows-latest
             artifact_name: PrivateCrossVPN-windows-latest.exe
@@ -236,12 +233,6 @@ jobs:
           git tag -a "${{ needs.version.outputs.tag }}" -m "Release ${{ needs.version.outputs.tag }}"
           git push origin "${{ needs.version.outputs.tag }}"
 
-      - name: Download Windows 2022 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-binary-windows-2022
-          path: release-assets
-
       - name: Download Windows latest artifact
         uses: actions/download-artifact@v4
         with:
@@ -277,7 +268,6 @@ jobs:
             ## Build Matrix
             | Target | Runner | Artifact |
             |---|---|---|
-            | Windows x64 | `windows-2022` (GitHub-hosted) | `PrivateCrossVPN-windows-2022.exe` |
             | Windows x64 | `windows-latest` (GitHub-hosted) | `PrivateCrossVPN-windows-latest.exe` |
             | Linux x64 | `self-hosted` labels: `self-hosted,linux,x64,ubuntu-20.04` | `PrivateCrossVPN-linux-ubuntu-20.04` |
             | Linux x64 | `ubuntu-22.04` (GitHub-hosted) | `PrivateCrossVPN-linux-ubuntu-22.04` |
@@ -285,7 +275,6 @@ jobs:
 
             Commit: `${{ github.event.workflow_run.head_sha || github.sha }}`
           files: |
-            release-assets/PrivateCrossVPN-windows-2022.exe
             release-assets/PrivateCrossVPN-windows-latest.exe
             release-assets/PrivateCrossVPN-linux-ubuntu-20.04
             release-assets/PrivateCrossVPN-linux-ubuntu-22.04

@@ -50,7 +50,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 APP_NAME = "PrivateCrossVPN"
-APP_VERSION = os.environ.get("PVCVPN_VERSION", "1.1.0")
+APP_VERSION = os.environ.get("PVCVPN_VERSION", "1.1.5")
 LOG_DATE_FMT = "%Y-%m-%d %H:%M:%S"
 IP_API_URL = "https://ipinfo.io/json"
 IP_API_TIMEOUT = 8  # seconds
@@ -519,6 +519,15 @@ class SystemHandler:
             else:
                 relaunch_target = [sys.executable, *sys.argv]
 
+            # Avoid passing PyInstaller onefile runtime internals to the elevated process.
+            # Otherwise, the child may reuse the parent _MEI temp directory and fail after
+            # the parent exits and cleans up that directory.
+            clean_env = {
+                key: value
+                for key, value in os.environ.items()
+                if not (key.startswith("_PYI") or key.startswith("PYINSTALLER_") or key == "_MEIPASS2")
+            }
+
             candidates: list[list[str]] = []
             has_tty = False
             try:
@@ -528,7 +537,7 @@ class SystemHandler:
 
             # Prefer sudo when launched from a terminal so password prompt stays visible.
             if has_tty and shutil.which("sudo"):
-                candidates.append(["sudo", "-E", *relaunch_target])
+                candidates.append(["sudo", *relaunch_target])
 
             if shutil.which("pkexec"):
                 pkexec_cmd = ["pkexec", "env"]
@@ -540,12 +549,12 @@ class SystemHandler:
                 candidates.append(pkexec_cmd)
 
             if shutil.which("sudo") and not has_tty:
-                candidates.append(["sudo", "-E", *relaunch_target])
+                candidates.append(["sudo", *relaunch_target])
 
             for args in candidates:
                 try:
                     logger.info("Re-launching with: %s", " ".join(args))
-                    subprocess.Popen(args, shell=False)
+                    subprocess.Popen(args, shell=False, env=clean_env)
                     return True
                 except Exception as exc:
                     logger.error("Elevation with %s failed: %s", args[0], exc)
