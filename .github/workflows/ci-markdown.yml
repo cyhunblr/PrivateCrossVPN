@@ -1,0 +1,30 @@
+name: CI Markdown
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-markdown-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Lint Markdown
+        run: |
+          npm install markdownlint-cli
+          ./node_modules/.bin/markdownlint "*.md" "docs/*.md" --config .markdownlint.json

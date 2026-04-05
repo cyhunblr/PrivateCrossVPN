@@ -1,0 +1,52 @@
+name: CI Mobile
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-mobile-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ">=3.16.0"
+          channel: stable
+
+      - name: Verify pubspec version matches desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          mobile_version=$(grep "^version:" mobile/pubspec.yaml | head -1 | cut -d: -f2 | xargs)
+          desktop_version=$(grep "^APP_VERSION" privatecrossvpn.py | grep -oE '"[^"]+"' | head -1 | tr -d '"')
+          
+          mobile_base=$(echo "$mobile_version" | cut -d+ -f1)
+          
+          if [[ "$mobile_base" != "$desktop_version" ]]; then
+            echo "Version mismatch: mobile=$mobile_base desktop=$desktop_version"
+            exit 1
+          fi
+
+      - name: Get Flutter dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Analyze Flutter code
+        working-directory: mobile
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        working-directory: mobile
+        run: flutter test

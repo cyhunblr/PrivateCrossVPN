@@ -1,4 +1,4 @@
-name: CI
+name: CI Python
 
 on:
   pull_request:
@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-python-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint-and-test:
+  version-lint-test:
     runs-on:
       - self-hosted
       - linux
@@ -37,16 +37,6 @@ jobs:
       - name: Verify version references
         run: |
           python scripts/version_sync.py --check
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Lint Markdown
-        run: |
-          npm install markdownlint-cli
-          ./node_modules/.bin/markdownlint "*.md" "docs/*.md" --config .markdownlint.json
 
       - name: Lint
         run: |

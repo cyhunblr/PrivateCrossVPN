@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.privatecrossvpn.app.tunnel</string>
+    <key>CFBundleName</key>
+    <string>PrivateCrossVPN Tunnel</string>
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.networkextension.packet-tunnel</string>
+        <key>NSExtensionPrincipalClass</key>
+        <string>PacketTunnelProvider</string>
+    </dict>
+    <key>NEMachServiceName</key>
+    <string>$(TeamIdentifierPrefix)com.privatecrossvpn.app.tunnel</string>
+</dict>
+</plist>

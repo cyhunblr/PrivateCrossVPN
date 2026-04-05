@@ -3,7 +3,9 @@ name: Release
 on:
   workflow_run:
     workflows:
-      - CI
+      - CI Python
+      - CI Markdown
+      - CI Mobile
     types:
       - completed
     branches:
@@ -50,14 +52,9 @@ jobs:
           fi
 
           commit_subjects=$(git log --format=%s $log_range || true)
-          commit_bodies=$(git log --format=%B $log_range || true)
 
           bump_type="patch"
-          if echo "$commit_bodies" | grep -Eq 'BREAKING CHANGE|BREAKING-CHANGE'; then
-            bump_type="major"
-          elif echo "$commit_subjects" | grep -Eq '^[a-zA-Z0-9_-]+(\([^)]+\))?!:'; then
-            bump_type="major"
-          elif echo "$commit_subjects" | grep -Eq '^feat(\([^)]+\))?:'; then
+          if echo "$commit_subjects" | grep -Eq '^feat(\([^)]+\))?:'; then
             bump_type="minor"
           fi
 
@@ -85,12 +82,36 @@ jobs:
           target_sha="${{ github.event.workflow_run.head_sha || github.sha }}"
           latest_main_sha=$(git rev-parse origin/main)
 
-          if [[ "$target_sha" == "$latest_main_sha" ]]; then
+          if [[ "$target_sha" != "$latest_main_sha" ]]; then
+            echo "release_allowed=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping stale run. target=$target_sha latest_main=$latest_main_sha"
+            exit 0
+          fi
+
+          # Check if there are any commits that warrant a release (feat, fix, breaking changes)
+          latest_tag=$(git tag --list 'v*' --sort=-v:refname | head -n1 || true)
+          if [[ -z "$latest_tag" ]]; then
+            log_range="HEAD"
+          else
+            log_range="${latest_tag}..HEAD"
+          fi
+
+          commit_subjects=$(git log --format=%s $log_range || true)
+          commit_bodies=$(git log --format=%B $log_range || true)
+
+          has_releasable_commits=false
+          if echo "$commit_subjects" | grep -Eq '^feat(\([^)]+\))?:'; then
+            has_releasable_commits=true
+          elif echo "$commit_subjects" | grep -Eq '^fix(\([^)]+\))?:'; then
+            has_releasable_commits=true
+          fi
+
+          if [[ "$has_releasable_commits" == "true" ]]; then
             echo "release_allowed=true" >> "$GITHUB_OUTPUT"
             echo "Release allowed for latest main SHA: $target_sha"
           else
             echo "release_allowed=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping stale run. target=$target_sha latest_main=$latest_main_sha"
+            echo "Skipping release: only non-functional commits (chore, docs, style, ci, build)"
           fi
 
   build-windows:
