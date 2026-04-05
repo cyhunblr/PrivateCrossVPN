@@ -131,41 +131,56 @@ sudo ./dist/PrivateCrossVPN
 
 The CI workflow supports both GitHub-hosted and self-hosted Linux runners.
 
-How routing works:
+**How routing works:**
 
 - `CI_RUNNER_MODE=self-hosted` (repository variable): push/PR jobs run on self-hosted.
 - `CI_RUNNER_MODE=github` or unset: push/PR jobs run on GitHub-hosted Ubuntu.
 - Manual runs (`workflow_dispatch`) can override routing with `runner_target` (`auto`, `github`, `self-hosted`).
 
-Set up a self-hosted Linux runner (one-time):
+**Set up a self-hosted Linux runner (one-time):**
 
 1. Open GitHub repository settings:
     - `Settings` → `Actions` → `Runners` → `New self-hosted runner`
-2. Choose Linux x64 and copy the generated commands.
-3. Run them on your runner machine, for example:
+2. Choose **Linux** and **x64** architecture.
+3. Copy the generated setup commands from GitHub's page. They will include your unique token and repo URL. Run them on your runner machine:
 
 ```bash
+# Create runner directory and download
 mkdir -p ~/actions-runner && cd ~/actions-runner
 curl -o actions-runner-linux-x64.tar.gz -L https://github.com/actions/runner/releases/download/v2.325.0/actions-runner-linux-x64-2.325.0.tar.gz
+
+# Optional: Validate the download (GitHub provides the hash on the setup page)
+# echo "HASH_HERE  actions-runner-linux-x64.tar.gz" | shasum -a 256 -c
+
+# Extract
 tar xzf ./actions-runner-linux-x64.tar.gz
+
+# Configure (replace <org>, <repo>, and <TOKEN> with values from GitHub)
 ./config.sh --url https://github.com/<org>/<repo> --token <TOKEN>
+
+# Install and start as a background service
 sudo ./svc.sh install
 sudo ./svc.sh start
 ```
 
-Verify runner status:
+**Verify runner is connected:**
 
 ```bash
 sudo ./svc.sh status
 ```
 
-Enable self-hosted by default for this repo:
+Runner logs are at `~/actions-runner/_diag/`.
+
+**Enable self-hosted by default for this repo:**
 
 1. `Settings` → `Secrets and variables` → `Actions` → `Variables`
-2. Add repository variable:
+2. Add a new repository variable:
     - Name: `CI_RUNNER_MODE`
     - Value: `self-hosted`
+3. Next push will automatically use your self-hosted runner.
 
-Switch back to GitHub-hosted default:
+**Switch back to GitHub-hosted:**
 
-- Set `CI_RUNNER_MODE=github` (or remove the variable).
+- Set `CI_RUNNER_MODE=github` or delete the variable.
+
+**Note on tokens:** The configuration token from GitHub's setup page is valid for a limited time. If setup takes longer or the token expires, regenerate it in `Settings` → `Actions` → `Runners` and run `./config.sh` again.
