@@ -126,3 +126,46 @@ sudo ./dist/PrivateCrossVPN
 - **Release**: `.github/workflows/release.yml` runs only after the CI workflow succeeds on `main`, bumps the patch version automatically, builds Windows and Ubuntu 20.04 executables, creates a `v*` tag, and publishes the GitHub Release.
 - **Markdown lint**: CI also runs `markdownlint-cli` against `README.md`, `BUILD.md`, and the docs under `docs/`.
 - **Local dev checks**: `pip install -r requirements-dev.txt` then run `ruff check .` and `pytest -q`.
+
+### Hybrid CI with Self-Hosted Runner
+
+The CI workflow supports both GitHub-hosted and self-hosted Linux runners.
+
+How routing works:
+
+- `CI_RUNNER_MODE=self-hosted` (repository variable): push/PR jobs run on self-hosted.
+- `CI_RUNNER_MODE=github` or unset: push/PR jobs run on GitHub-hosted Ubuntu.
+- Manual runs (`workflow_dispatch`) can override routing with `runner_target` (`auto`, `github`, `self-hosted`).
+
+Set up a self-hosted Linux runner (one-time):
+
+1. Open GitHub repository settings:
+    - `Settings` → `Actions` → `Runners` → `New self-hosted runner`
+2. Choose Linux x64 and copy the generated commands.
+3. Run them on your runner machine, for example:
+
+```bash
+mkdir -p ~/actions-runner && cd ~/actions-runner
+curl -o actions-runner-linux-x64.tar.gz -L https://github.com/actions/runner/releases/download/v2.325.0/actions-runner-linux-x64-2.325.0.tar.gz
+tar xzf ./actions-runner-linux-x64.tar.gz
+./config.sh --url https://github.com/<org>/<repo> --token <TOKEN>
+sudo ./svc.sh install
+sudo ./svc.sh start
+```
+
+Verify runner status:
+
+```bash
+sudo ./svc.sh status
+```
+
+Enable self-hosted by default for this repo:
+
+1. `Settings` → `Secrets and variables` → `Actions` → `Variables`
+2. Add repository variable:
+    - Name: `CI_RUNNER_MODE`
+    - Value: `self-hosted`
+
+Switch back to GitHub-hosted default:
+
+- Set `CI_RUNNER_MODE=github` (or remove the variable).
