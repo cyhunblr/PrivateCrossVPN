@@ -30,7 +30,12 @@ jobs:
         run: |
           set -euo pipefail
           mobile_version=$(grep "^version:" mobile/pubspec.yaml | head -1 | cut -d: -f2 | xargs)
-          desktop_version=$(grep "^APP_VERSION" privatecrossvpn.py | grep -oE '"[^"]+"' | head -1 | tr -d '"')
+          desktop_version=$(sed -n 's/.*PVCVPN_VERSION", "\([0-9]\+\.[0-9]\+\.[0-9]\+\)".*/\1/p' privatecrossvpn.py | head -1)
+
+          if [[ -z "$desktop_version" ]]; then
+            echo "Could not parse APP_VERSION default from privatecrossvpn.py"
+            exit 1
+          fi
           
           mobile_base=$(echo "$mobile_version" | cut -d+ -f1)
           

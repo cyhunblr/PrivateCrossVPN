@@ -50,7 +50,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 APP_NAME = "PrivateCrossVPN"
-APP_VERSION = os.environ.get("PVCVPN_VERSION", "1.2.2")
+APP_VERSION = os.environ.get("PVCVPN_VERSION", "1.2.3")
 LOG_DATE_FMT = "%Y-%m-%d %H:%M:%S"
 IP_API_URL = "https://ipinfo.io/json"
 IP_API_TIMEOUT = 8  # seconds
@@ -63,6 +63,7 @@ DEFAULT_CONFIGS_DIR = APP_DIR / "configs"
 DEFAULT_CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
 SETTINGS_FILE = APP_DIR / "settings.json"
 
+
 # Icon path resolution: works both from source and when packaged (PyInstaller/Nuitka)
 def _resolve_asset_path(relative: str) -> Path:
     """Resolve path to a bundled asset, supporting PyInstaller's _MEIPASS."""
@@ -72,6 +73,7 @@ def _resolve_asset_path(relative: str) -> Path:
         base = Path(__file__).resolve().parent
     return base / relative
 
+
 ICON_PNG = _resolve_asset_path("img/logo.png")
 ICON_ICO = _resolve_asset_path("img/logo.ico")
 
@@ -79,6 +81,7 @@ ICON_ICO = _resolve_asset_path("img/logo.ico")
 # ---------------------------------------------------------------------------
 # Enums & Data Classes
 # ---------------------------------------------------------------------------
+
 
 class OSType(Enum):
     WINDOWS = auto()
@@ -104,17 +107,20 @@ class TunnelState(Enum):
 @dataclass
 class ConnectionProfile:
     """Holds all parameters needed to establish a tunnel."""
+
     protocol: Protocol
-    config_path: Optional[Path] = None       # .conf / .ovpn
+    config_path: Optional[Path] = None  # .conf / .ovpn
     ssh_host: str = ""
     ssh_port: int = 22
     ssh_user: str = ""
-    ssh_key_path: Optional[Path] = None      # .pem
+    ssh_key_path: Optional[Path] = None  # .pem
     socks_port: int = 1080
     extra_args: list[str] = field(default_factory=list)
 
 
-def build_ssh_login_command(key_path: Path, server_ip: str, ssh_user: str = "root", ssh_port: str = "22") -> str:
+def build_ssh_login_command(
+    key_path: Path, server_ip: str, ssh_user: str = "root", ssh_port: str = "22"
+) -> str:
     """Build a shell-safe SSH login command for the Setup wizard."""
     return (
         f"ssh -i {shlex.quote(str(key_path))} "
@@ -179,32 +185,56 @@ def build_local_dependency_install_commands(
 
         if has_pkexec:
             package_list = " ".join(packages)
-            return [[
-                "pkexec", "bash", "-lc",
-                f"apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y {package_list}",
-            ]]
+            return [
+                [
+                    "pkexec",
+                    "bash",
+                    "-lc",
+                    f"apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y {package_list}",
+                ]
+            ]
 
         return []
 
     if os_type == OSType.WINDOWS:
         commands: list[list[str]] = []
         if "OpenSSH Client" in missing:
-            commands.append([
-                "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
-                "Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
-            ])
+            commands.append(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    "Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
+                ]
+            )
 
         if has_winget:
             if "WireGuard" in missing:
-                commands.append([
-                    "winget", "install", "-e", "--id", "WireGuard.WireGuard",
-                    "--accept-package-agreements", "--accept-source-agreements",
-                ])
+                commands.append(
+                    [
+                        "winget",
+                        "install",
+                        "-e",
+                        "--id",
+                        "WireGuard.WireGuard",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ]
+                )
             if "OpenVPN" in missing:
-                commands.append([
-                    "winget", "install", "-e", "--id", "OpenVPNTechnologies.OpenVPN",
-                    "--accept-package-agreements", "--accept-source-agreements",
-                ])
+                commands.append(
+                    [
+                        "winget",
+                        "install",
+                        "-e",
+                        "--id",
+                        "OpenVPNTechnologies.OpenVPN",
+                        "--accept-package-agreements",
+                        "--accept-source-agreements",
+                    ]
+                )
 
         return commands
 
@@ -224,6 +254,7 @@ class IPInfo:
 # ---------------------------------------------------------------------------
 # App Settings (persisted to JSON)
 # ---------------------------------------------------------------------------
+
 
 class AppSettings:
     """Manages persistent application settings."""
@@ -288,6 +319,7 @@ class AppSettings:
 # Profile Manager — save / load / list / delete profiles as JSON
 # ---------------------------------------------------------------------------
 
+
 class ProfileManager:
     """Manages saved VPN profiles as JSON files in the configs directory."""
 
@@ -307,7 +339,7 @@ class ProfileManager:
 
     def save_profile(self, name: str, data: dict[str, Any]) -> Path:
         """Save a profile dict as JSON. Returns the saved file path."""
-        safe_name = re.sub(r'[^\w\-. ]', '_', name)
+        safe_name = re.sub(r"[^\w\-. ]", "_", name)
         path = self._dir / f"{safe_name}.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -436,6 +468,7 @@ class ProfileManager:
 # Logging — thread-safe queue-based handler that feeds into the UI
 # ---------------------------------------------------------------------------
 
+
 class QueueLogHandler(logging.Handler):
     """Pushes log records into a queue for the UI to consume."""
 
@@ -456,17 +489,22 @@ logger = logging.getLogger(APP_NAME)
 logger.setLevel(logging.DEBUG)
 
 _queue_handler = QueueLogHandler(log_queue)
-_queue_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt=LOG_DATE_FMT))
+_queue_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt=LOG_DATE_FMT)
+)
 logger.addHandler(_queue_handler)
 
 _stream_handler = logging.StreamHandler(sys.stdout)
-_stream_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt=LOG_DATE_FMT))
+_stream_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt=LOG_DATE_FMT)
+)
 logger.addHandler(_stream_handler)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  MODULE 1 — SystemHandler
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class SystemHandler:
     """Detects the host OS and manages administrative privilege escalation."""
@@ -504,7 +542,12 @@ class SystemHandler:
             try:
                 params = " ".join([f'"{arg}"' for arg in sys.argv])
                 ret = ctypes.windll.shell32.ShellExecuteW(  # type: ignore[attr-defined]
-                    None, "runas", sys.executable, params, None, 1,
+                    None,
+                    "runas",
+                    sys.executable,
+                    params,
+                    None,
+                    1,
                 )
                 return ret > 32
             except Exception as exc:
@@ -525,7 +568,11 @@ class SystemHandler:
             clean_env = {
                 key: value
                 for key, value in os.environ.items()
-                if not (key.startswith("_PYI") or key.startswith("PYINSTALLER_") or key == "_MEIPASS2")
+                if not (
+                    key.startswith("_PYI")
+                    or key.startswith("PYINSTALLER_")
+                    or key == "_MEIPASS2"
+                )
             }
 
             candidates: list[list[str]] = []
@@ -537,7 +584,12 @@ class SystemHandler:
 
             if shutil.which("pkexec"):
                 pkexec_cmd = ["pkexec", "env"]
-                for key in ("DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
+                for key in (
+                    "DISPLAY",
+                    "XAUTHORITY",
+                    "WAYLAND_DISPLAY",
+                    "XDG_RUNTIME_DIR",
+                ):
                     value = os.environ.get(key)
                     if value:
                         pkexec_cmd.append(f"{key}={value}")
@@ -582,8 +634,13 @@ class SystemHandler:
             if self.os_type == OSType.WINDOWS:
                 extra["creationflags"] = subprocess.CREATE_NO_WINDOW
             result = subprocess.run(
-                args, shell=False, capture_output=capture,
-                text=True, timeout=timeout, check=check, **extra,
+                args,
+                shell=False,
+                capture_output=capture,
+                text=True,
+                timeout=timeout,
+                check=check,
+                **extra,
             )
             if result.stdout:
                 for line in result.stdout.strip().splitlines():
@@ -602,7 +659,9 @@ class SystemHandler:
                 for line in stderr.splitlines():
                     logger.debug("  stderr: %s", line)
 
-            detail = stderr or stdout or f"Command failed with exit code {exc.returncode}."
+            detail = (
+                stderr or stdout or f"Command failed with exit code {exc.returncode}."
+            )
             logger.error("Command failed: %s", detail)
             raise RuntimeError(detail) from exc
         except subprocess.TimeoutExpired:
@@ -618,8 +677,12 @@ class SystemHandler:
         if self.os_type == OSType.WINDOWS:
             kwargs.setdefault("creationflags", subprocess.CREATE_NO_WINDOW)
         return subprocess.Popen(
-            args, shell=False, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, **kwargs,
+            args,
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            **kwargs,
         )
 
     def _elevate_args_if_needed(self, args: list[str]) -> list[str]:
@@ -632,10 +695,16 @@ class SystemHandler:
             return args
 
         privileged_bins = {
-            "wg-quick", "wg", "openvpn",
-            "iptables", "ip6tables",
-            "systemctl", "ufw",
-            "apt", "apt-get", "chown",
+            "wg-quick",
+            "wg",
+            "openvpn",
+            "iptables",
+            "ip6tables",
+            "systemctl",
+            "ufw",
+            "apt",
+            "apt-get",
+            "chown",
         }
         if first not in privileged_bins:
             return args
@@ -659,6 +728,7 @@ class SystemHandler:
 #  MODULE 2 — SecurityGuard  (Kill-Switch)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class SecurityGuard:
     """Kill-Switch: blocks all non-VPN traffic via OS firewall."""
 
@@ -672,7 +742,13 @@ class SecurityGuard:
     def is_active(self) -> bool:
         return self._active
 
-    def enable(self, vpn_interface: str = "", vpn_server_ip: str = "", vpn_port: int = 0, protocol_name: str = "udp") -> None:
+    def enable(
+        self,
+        vpn_interface: str = "",
+        vpn_server_ip: str = "",
+        vpn_port: int = 0,
+        protocol_name: str = "udp",
+    ) -> None:
         if self._active:
             logger.info("Kill-switch already active.")
             return
@@ -681,7 +757,9 @@ class SecurityGuard:
             if self.system.os_type == OSType.WINDOWS:
                 self._enable_windows(vpn_server_ip, vpn_port, protocol_name)
             elif self.system.os_type == OSType.LINUX:
-                self._enable_linux(vpn_interface, vpn_server_ip, vpn_port, protocol_name)
+                self._enable_linux(
+                    vpn_interface, vpn_server_ip, vpn_port, protocol_name
+                )
             self._active = True
             logger.info("Kill-switch ENABLED.")
         except Exception as exc:
@@ -705,16 +783,29 @@ class SecurityGuard:
 
     # --- Windows (netsh advfirewall) ----------------------------------------
 
-    def _enable_windows(self, vpn_server_ip: str, vpn_port: int, protocol_name: str) -> None:
-        self.system.run_cmd([
-            "netsh", "advfirewall", "set", "allprofiles",
-            "firewallpolicy", "blockinbound,blockoutbound",
-        ])
+    def _enable_windows(
+        self, vpn_server_ip: str, vpn_port: int, protocol_name: str
+    ) -> None:
+        self.system.run_cmd(
+            [
+                "netsh",
+                "advfirewall",
+                "set",
+                "allprofiles",
+                "firewallpolicy",
+                "blockinbound,blockoutbound",
+            ]
+        )
         if vpn_server_ip:
             cmd = [
-                "netsh", "advfirewall", "firewall", "add", "rule",
+                "netsh",
+                "advfirewall",
+                "firewall",
+                "add",
+                "rule",
                 f"name={self.RULE_PREFIX}_AllowVPN",
-                "dir=out", "action=allow",
+                "dir=out",
+                "action=allow",
                 f"remoteip={vpn_server_ip}",
                 f"protocol={protocol_name}",
             ]
@@ -722,37 +813,73 @@ class SecurityGuard:
                 cmd.append(f"remoteport={vpn_port}")
             cmd.append("enable=yes")
             self.system.run_cmd(cmd)
-        self.system.run_cmd([
-            "netsh", "advfirewall", "firewall", "add", "rule",
-            f"name={self.RULE_PREFIX}_AllowLoopback",
-            "dir=out", "action=allow", "remoteip=127.0.0.0/8", "enable=yes",
-        ])
+        self.system.run_cmd(
+            [
+                "netsh",
+                "advfirewall",
+                "firewall",
+                "add",
+                "rule",
+                f"name={self.RULE_PREFIX}_AllowLoopback",
+                "dir=out",
+                "action=allow",
+                "remoteip=127.0.0.0/8",
+                "enable=yes",
+            ]
+        )
         for subnet in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"):
-            self.system.run_cmd([
-                "netsh", "advfirewall", "firewall", "add", "rule",
-                f"name={self.RULE_PREFIX}_AllowLAN_{subnet.replace('/', '_')}",
-                "dir=out", "action=allow", f"remoteip={subnet}", "enable=yes",
-            ])
+            self.system.run_cmd(
+                [
+                    "netsh",
+                    "advfirewall",
+                    "firewall",
+                    "add",
+                    "rule",
+                    f"name={self.RULE_PREFIX}_AllowLAN_{subnet.replace('/', '_')}",
+                    "dir=out",
+                    "action=allow",
+                    f"remoteip={subnet}",
+                    "enable=yes",
+                ]
+            )
 
     def _disable_windows(self) -> None:
-        for suffix in ("_AllowVPN", "_AllowLoopback",
-                        "_AllowLAN_10.0.0.0_8", "_AllowLAN_172.16.0.0_12",
-                        "_AllowLAN_192.168.0.0_16"):
+        for suffix in (
+            "_AllowVPN",
+            "_AllowLoopback",
+            "_AllowLAN_10.0.0.0_8",
+            "_AllowLAN_172.16.0.0_12",
+            "_AllowLAN_192.168.0.0_16",
+        ):
             try:
-                self.system.run_cmd([
-                    "netsh", "advfirewall", "firewall", "delete", "rule",
-                    f"name={self.RULE_PREFIX}{suffix}",
-                ])
+                self.system.run_cmd(
+                    [
+                        "netsh",
+                        "advfirewall",
+                        "firewall",
+                        "delete",
+                        "rule",
+                        f"name={self.RULE_PREFIX}{suffix}",
+                    ]
+                )
             except Exception:
                 pass
-        self.system.run_cmd([
-            "netsh", "advfirewall", "set", "allprofiles",
-            "firewallpolicy", "blockinbound,allowoutbound",
-        ])
+        self.system.run_cmd(
+            [
+                "netsh",
+                "advfirewall",
+                "set",
+                "allprofiles",
+                "firewallpolicy",
+                "blockinbound,allowoutbound",
+            ]
+        )
 
     # --- Linux (iptables) ---------------------------------------------------
 
-    def _enable_linux(self, vpn_interface: str, vpn_server_ip: str, vpn_port: int, protocol_name: str) -> None:
+    def _enable_linux(
+        self, vpn_interface: str, vpn_server_ip: str, vpn_port: int, protocol_name: str
+    ) -> None:
         ipt = "iptables"
         for cmd in (
             [ipt, "-D", "OUTPUT", "-j", self.RULE_PREFIX],
@@ -766,11 +893,22 @@ class SecurityGuard:
         self.system.run_cmd([ipt, "-N", self.RULE_PREFIX])
         self.system.run_cmd([ipt, "-A", self.RULE_PREFIX, "-o", "lo", "-j", "ACCEPT"])
         for subnet in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"):
-            self.system.run_cmd([ipt, "-A", self.RULE_PREFIX, "-d", subnet, "-j", "ACCEPT"])
-        self.system.run_cmd([
-            ipt, "-A", self.RULE_PREFIX,
-            "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT",
-        ])
+            self.system.run_cmd(
+                [ipt, "-A", self.RULE_PREFIX, "-d", subnet, "-j", "ACCEPT"]
+            )
+        self.system.run_cmd(
+            [
+                ipt,
+                "-A",
+                self.RULE_PREFIX,
+                "-m",
+                "conntrack",
+                "--ctstate",
+                "ESTABLISHED,RELATED",
+                "-j",
+                "ACCEPT",
+            ]
+        )
         if vpn_server_ip:
             cmd = [ipt, "-A", self.RULE_PREFIX, "-d", vpn_server_ip]
             if protocol_name:
@@ -780,7 +918,9 @@ class SecurityGuard:
             cmd += ["-j", "ACCEPT"]
             self.system.run_cmd(cmd)
         if vpn_interface:
-            self.system.run_cmd([ipt, "-A", self.RULE_PREFIX, "-o", vpn_interface, "-j", "ACCEPT"])
+            self.system.run_cmd(
+                [ipt, "-A", self.RULE_PREFIX, "-o", vpn_interface, "-j", "ACCEPT"]
+            )
         self.system.run_cmd([ipt, "-A", self.RULE_PREFIX, "-j", "DROP"])
         self.system.run_cmd([ipt, "-I", "OUTPUT", "-j", self.RULE_PREFIX])
 
@@ -800,6 +940,7 @@ class SecurityGuard:
 # ═══════════════════════════════════════════════════════════════════════════
 #  MODULE 3 — TunnelEngine
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class BaseTunnel:
     """Abstract base for tunnel implementations."""
@@ -849,6 +990,7 @@ class BaseTunnel:
                         logger.debug("[%s] %s", label, stripped)
             except Exception:
                 pass
+
         for stream, label in ((proc.stdout, "OUT"), (proc.stderr, "ERR")):
             t = threading.Thread(target=_reader, args=(stream, label), daemon=True)
             t.start()
@@ -867,7 +1009,9 @@ class WireGuardTunnel(BaseTunnel):
         if self.system.os_type == OSType.LINUX:
             wg_quick = self.system.check_binary("wg-quick")
             if not wg_quick:
-                raise RuntimeError("wg-quick not found. Install: sudo apt install wireguard")
+                raise RuntimeError(
+                    "wg-quick not found. Install: sudo apt install wireguard"
+                )
 
             # wg-quick derives interface from filename stem. Ensure compatibility.
             runtime_conf = conf
@@ -889,7 +1033,9 @@ class WireGuardTunnel(BaseTunnel):
             if not self.system.check_binary("resolvconf"):
                 conf_text = runtime_conf.read_text(encoding="utf-8")
                 if re.search(r"^\s*DNS\s*=", conf_text, flags=re.MULTILINE):
-                    runtime_conf.write_text(strip_wireguard_dns_directives(conf_text), encoding="utf-8")
+                    runtime_conf.write_text(
+                        strip_wireguard_dns_directives(conf_text), encoding="utf-8"
+                    )
                     try:
                         runtime_conf.chmod(0o600)
                     except Exception:
@@ -900,14 +1046,18 @@ class WireGuardTunnel(BaseTunnel):
                         "Install 'openresolv' (or resolvconf package) to auto-apply VPN DNS."
                     )
 
-            self.system.run_cmd([wg_quick, "up", str(runtime_conf)], timeout=30, check=True)
+            self.system.run_cmd(
+                [wg_quick, "up", str(runtime_conf)], timeout=30, check=True
+            )
         elif self.system.os_type == OSType.WINDOWS:
             wg_exe = self.system.check_binary("wireguard.exe")
             if not wg_exe:
                 wg_exe = r"C:\Program Files\WireGuard\wireguard.exe"
                 if not Path(wg_exe).exists():
                     raise RuntimeError("wireguard.exe not found.")
-            self.system.run_cmd([wg_exe, "/installtunnelservice", str(conf)], timeout=30, check=True)
+            self.system.run_cmd(
+                [wg_exe, "/installtunnelservice", str(conf)], timeout=30, check=True
+            )
         self.state = TunnelState.CONNECTED
         logger.info("WireGuard tunnel CONNECTED.")
 
@@ -920,15 +1070,27 @@ class WireGuardTunnel(BaseTunnel):
         if conf:
             if self.system.os_type == OSType.LINUX:
                 try:
-                    self.system.run_cmd([self.system.check_binary("wg-quick") or "wg-quick", "down", str(conf)], timeout=30)
+                    self.system.run_cmd(
+                        [
+                            self.system.check_binary("wg-quick") or "wg-quick",
+                            "down",
+                            str(conf),
+                        ],
+                        timeout=30,
+                    )
                 except Exception as exc:
                     logger.error("wg-quick down failed: %s", exc)
             elif self.system.os_type == OSType.WINDOWS:
                 try:
-                    self.system.run_cmd([
-                        self.system.check_binary("wireguard.exe") or "wireguard.exe",
-                        "/uninstalltunnelservice", conf.stem,
-                    ], timeout=30)
+                    self.system.run_cmd(
+                        [
+                            self.system.check_binary("wireguard.exe")
+                            or "wireguard.exe",
+                            "/uninstalltunnelservice",
+                            conf.stem,
+                        ],
+                        timeout=30,
+                    )
                 except Exception as exc:
                     logger.error("wireguard.exe uninstall failed: %s", exc)
         self.state = TunnelState.DISCONNECTED
@@ -940,12 +1102,20 @@ class WireGuardTunnel(BaseTunnel):
         iface = self.profile.config_path.stem
         if self.system.os_type == OSType.LINUX:
             try:
-                return self.system.run_cmd([self.system.check_binary("wg") or "wg", "show", iface], timeout=10).returncode == 0
+                return (
+                    self.system.run_cmd(
+                        [self.system.check_binary("wg") or "wg", "show", iface],
+                        timeout=10,
+                    ).returncode
+                    == 0
+                )
             except Exception:
                 return False
         elif self.system.os_type == OSType.WINDOWS:
             try:
-                r = self.system.run_cmd(["sc", "query", f"WireGuardTunnel${iface}"], timeout=10)
+                r = self.system.run_cmd(
+                    ["sc", "query", f"WireGuardTunnel${iface}"], timeout=10
+                )
                 return "RUNNING" in (r.stdout or "")
             except Exception:
                 return False
@@ -965,7 +1135,16 @@ class OpenVPNTunnel(BaseTunnel):
         openvpn = self._find_binary()
         if not openvpn:
             raise RuntimeError("openvpn binary not found.")
-        args = [openvpn, "--config", str(conf), "--management", "127.0.0.1", "7505", "--verb", "4"]
+        args = [
+            openvpn,
+            "--config",
+            str(conf),
+            "--management",
+            "127.0.0.1",
+            "7505",
+            "--verb",
+            "4",
+        ]
         self._process = self.system.popen_cmd(args)
         self._stream_output(self._process)
         time.sleep(3)
@@ -981,8 +1160,10 @@ class OpenVPNTunnel(BaseTunnel):
         if path:
             return path
         if self.system.os_type == OSType.WINDOWS:
-            for c in (r"C:\Program Files\OpenVPN\bin\openvpn.exe",
-                       r"C:\Program Files (x86)\OpenVPN\bin\openvpn.exe"):
+            for c in (
+                r"C:\Program Files\OpenVPN\bin\openvpn.exe",
+                r"C:\Program Files (x86)\OpenVPN\bin\openvpn.exe",
+            ):
                 if Path(c).exists():
                     return c
         return None
@@ -1006,18 +1187,33 @@ class SSHTunnel(BaseTunnel):
             raise ValueError("SSH host is required.")
         self.state = TunnelState.CONNECTING
         self._stop_event.clear()
-        logger.info("Starting SSH SOCKS5: %s@%s:%d -> :%d",
-                     p.ssh_user or "user", p.ssh_host, p.ssh_port, p.socks_port)
+        logger.info(
+            "Starting SSH SOCKS5: %s@%s:%d -> :%d",
+            p.ssh_user or "user",
+            p.ssh_host,
+            p.ssh_port,
+            p.socks_port,
+        )
         ssh_bin = self.system.check_binary("ssh")
         if not ssh_bin:
             raise RuntimeError("ssh binary not found.")
         args = [
-            ssh_bin, "-D", str(p.socks_port), "-N", "-C", "-q",
-            "-o", "StrictHostKeyChecking=accept-new",
-            "-o", "ServerAliveInterval=15",
-            "-o", "ServerAliveCountMax=3",
-            "-o", "ExitOnForwardFailure=yes",
-            "-p", str(p.ssh_port),
+            ssh_bin,
+            "-D",
+            str(p.socks_port),
+            "-N",
+            "-C",
+            "-q",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ServerAliveInterval=15",
+            "-o",
+            "ServerAliveCountMax=3",
+            "-o",
+            "ExitOnForwardFailure=yes",
+            "-p",
+            str(p.ssh_port),
         ]
         if p.ssh_key_path and p.ssh_key_path.exists():
             args += ["-i", str(p.ssh_key_path)]
@@ -1038,8 +1234,11 @@ class SSHTunnel(BaseTunnel):
             self.state = TunnelState.ERROR
             raise RuntimeError(f"SOCKS5 port {p.socks_port} not available.")
         self.state = TunnelState.CONNECTED
-        logger.info("SSH SOCKS5 CONNECTED (PID %d). Proxy: 127.0.0.1:%d",
-                     self._process.pid, p.socks_port)
+        logger.info(
+            "SSH SOCKS5 CONNECTED (PID %d). Proxy: 127.0.0.1:%d",
+            self._process.pid,
+            p.socks_port,
+        )
 
     @staticmethod
     def _check_port(port: int) -> bool:
@@ -1076,8 +1275,13 @@ class TunnelEngine:
 #  MODULE 4 — ReconnectManager
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class ReconnectManager:
-    def __init__(self, tunnel: BaseTunnel, on_state_change: Optional[Callable[[TunnelState], None]] = None) -> None:
+    def __init__(
+        self,
+        tunnel: BaseTunnel,
+        on_state_change: Optional[Callable[[TunnelState], None]] = None,
+    ) -> None:
         self.tunnel = tunnel
         self.on_state_change = on_state_change
         self._stop_event = threading.Event()
@@ -1087,7 +1291,9 @@ class ReconnectManager:
     def start(self) -> None:
         self._stop_event.clear()
         self._retries = 0
-        self._thread = threading.Thread(target=self._loop, daemon=True, name="ReconnectManager")
+        self._thread = threading.Thread(
+            target=self._loop, daemon=True, name="ReconnectManager"
+        )
         self._thread.start()
         logger.info("Reconnect monitor started.")
 
@@ -1114,7 +1320,9 @@ class ReconnectManager:
         while self._retries < RECONNECT_MAX_RETRIES and not self._stop_event.is_set():
             self._retries += 1
             delay = RECONNECT_DELAY_BASE * (2 ** (self._retries - 1))
-            logger.info("Reconnect %d/%d in %ds …", self._retries, RECONNECT_MAX_RETRIES, delay)
+            logger.info(
+                "Reconnect %d/%d in %ds …", self._retries, RECONNECT_MAX_RETRIES, delay
+            )
             self.tunnel.state = TunnelState.RECONNECTING
             if self.on_state_change:
                 self.on_state_change(TunnelState.RECONNECTING)
@@ -1143,15 +1351,21 @@ class ReconnectManager:
 #  IP Info
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 def fetch_ip_info() -> IPInfo:
     try:
-        req = Request(IP_API_URL, headers={"Accept": "application/json", "User-Agent": APP_NAME})
+        req = Request(
+            IP_API_URL, headers={"Accept": "application/json", "User-Agent": APP_NAME}
+        )
         with urlopen(req, timeout=IP_API_TIMEOUT) as resp:
             data = json.loads(resp.read().decode())
             return IPInfo(
-                ip=data.get("ip", "N/A"), city=data.get("city", "N/A"),
-                region=data.get("region", "N/A"), country=data.get("country", "N/A"),
-                org=data.get("org", "N/A"), timezone=data.get("timezone", "N/A"),
+                ip=data.get("ip", "N/A"),
+                city=data.get("city", "N/A"),
+                region=data.get("region", "N/A"),
+                country=data.get("country", "N/A"),
+                org=data.get("org", "N/A"),
+                timezone=data.get("timezone", "N/A"),
             )
     except Exception as exc:
         logger.warning("Failed to fetch IP info: %s", exc)
@@ -1161,6 +1375,7 @@ def fetch_ip_info() -> IPInfo:
 # ═══════════════════════════════════════════════════════════════════════════
 #  MODULE 5 — CustomTkinter UI
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class PrivateCrossVPNApp(ctk.CTk):
     WIDTH = 1060
@@ -1225,6 +1440,7 @@ class PrivateCrossVPNApp(ctk.CTk):
             elif ICON_PNG.exists():
                 # Linux / fallback: use PhotoImage from PNG
                 from tkinter import PhotoImage
+
                 icon = PhotoImage(file=str(ICON_PNG))
                 self.iconphoto(True, icon)
                 self._icon_ref = icon  # prevent garbage collection
@@ -1250,13 +1466,16 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         # Title
         ctk.CTkLabel(sb, text=APP_NAME, font=ctk.CTkFont(size=20, weight="bold")).grid(
-            row=0, column=0, padx=20, pady=(20, 2))
+            row=0, column=0, padx=20, pady=(20, 2)
+        )
         ctk.CTkLabel(sb, text=f"v{APP_VERSION}", font=ctk.CTkFont(size=11)).grid(
-            row=1, column=0, padx=20, pady=(0, 16))
+            row=1, column=0, padx=20, pady=(0, 16)
+        )
 
         # --- Saved Profiles ---
         ctk.CTkLabel(sb, text="Saved Profiles", anchor="w").grid(
-            row=2, column=0, padx=20, pady=(8, 0), sticky="w")
+            row=2, column=0, padx=20, pady=(8, 0), sticky="w"
+        )
 
         profile_frame = ctk.CTkFrame(sb, fg_color="transparent")
         profile_frame.grid(row=3, column=0, padx=20, pady=(4, 4), sticky="ew")
@@ -1264,65 +1483,96 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         self._profile_var = ctk.StringVar(value="(new profile)")
         self._profile_menu = ctk.CTkOptionMenu(
-            profile_frame, variable=self._profile_var,
-            values=["(new profile)"], command=self._on_profile_select,
+            profile_frame,
+            variable=self._profile_var,
+            values=["(new profile)"],
+            command=self._on_profile_select,
         )
         self._profile_menu.grid(row=0, column=0, sticky="ew", padx=(0, 4))
 
         self._delete_profile_btn = ctk.CTkButton(
-            profile_frame, text="X", width=32, fg_color="#c0392b",
-            hover_color="#a93226", command=self._on_delete_profile,
+            profile_frame,
+            text="X",
+            width=32,
+            fg_color="#c0392b",
+            hover_color="#a93226",
+            command=self._on_delete_profile,
         )
         self._delete_profile_btn.grid(row=0, column=1)
 
         # --- Protocol selector ---
         ctk.CTkLabel(sb, text="Protocol", anchor="w").grid(
-            row=4, column=0, padx=20, pady=(12, 0), sticky="w")
+            row=4, column=0, padx=20, pady=(12, 0), sticky="w"
+        )
         self._protocol_var = ctk.StringVar(value=Protocol.WIREGUARD.value)
         self._protocol_menu = ctk.CTkOptionMenu(
-            sb, values=[p.value for p in Protocol],
-            variable=self._protocol_var, command=self._on_protocol_change,
+            sb,
+            values=[p.value for p in Protocol],
+            variable=self._protocol_var,
+            command=self._on_protocol_change,
         )
         self._protocol_menu.grid(row=5, column=0, padx=20, pady=(4, 4), sticky="ew")
 
         # --- Import from file (alternative) ---
-        self._import_btn = ctk.CTkButton(sb, text="Import from File…", command=self._import_config)
+        self._import_btn = ctk.CTkButton(
+            sb, text="Import from File…", command=self._import_config
+        )
         self._import_btn.grid(row=6, column=0, padx=20, pady=(4, 4), sticky="ew")
 
         # Kill-switch
-        self._kill_switch_check = ctk.CTkCheckBox(sb, text="Kill-Switch", variable=self._kill_switch_var)
+        self._kill_switch_check = ctk.CTkCheckBox(
+            sb, text="Kill-Switch", variable=self._kill_switch_var
+        )
         self._kill_switch_check.grid(row=7, column=0, padx=20, pady=(12, 4), sticky="w")
 
         # Connect / Disconnect
         self._connect_btn = ctk.CTkButton(
-            sb, text="Connect", fg_color="green", hover_color="#2d8a2d",
+            sb,
+            text="Connect",
+            fg_color="green",
+            hover_color="#2d8a2d",
             command=self._on_connect,
         )
         self._connect_btn.grid(row=21, column=0, padx=20, pady=(10, 4), sticky="ew")
 
         self._disconnect_btn = ctk.CTkButton(
-            sb, text="Disconnect", fg_color="#c0392b", hover_color="#a93226",
-            command=self._on_disconnect, state="disabled",
+            sb,
+            text="Disconnect",
+            fg_color="#c0392b",
+            hover_color="#a93226",
+            command=self._on_disconnect,
+            state="disabled",
         )
         self._disconnect_btn.grid(row=22, column=0, padx=20, pady=(4, 10), sticky="ew")
 
         # Theme selector
-        ctk.CTkLabel(sb, text="Theme", anchor="w").grid(row=23, column=0, padx=20, pady=(10, 0), sticky="w")
+        ctk.CTkLabel(sb, text="Theme", anchor="w").grid(
+            row=23, column=0, padx=20, pady=(10, 0), sticky="w"
+        )
         ctk.CTkOptionMenu(
-            sb, values=["Dark", "Light", "System"],
+            sb,
+            values=["Dark", "Light", "System"],
             command=self._on_theme_change,
         ).grid(row=24, column=0, padx=20, pady=(4, 10), sticky="ew")
 
         # Configs directory
         ctk.CTkLabel(sb, text="Configs Folder", anchor="w").grid(
-            row=25, column=0, padx=20, pady=(6, 0), sticky="w")
+            row=25, column=0, padx=20, pady=(6, 0), sticky="w"
+        )
         self._configs_dir_label = ctk.CTkLabel(
-            sb, text=str(self.settings.configs_dir), anchor="w",
-            font=ctk.CTkFont(size=10), text_color="gray", wraplength=220,
+            sb,
+            text=str(self.settings.configs_dir),
+            anchor="w",
+            font=ctk.CTkFont(size=10),
+            text_color="gray",
+            wraplength=220,
         )
         self._configs_dir_label.grid(row=26, column=0, padx=20, pady=(2, 2), sticky="w")
         ctk.CTkButton(
-            sb, text="Change…", width=80, command=self._change_configs_dir,
+            sb,
+            text="Change…",
+            width=80,
+            command=self._change_configs_dir,
         ).grid(row=27, column=0, padx=20, pady=(2, 16), sticky="w")
 
     def _build_main_area(self) -> None:
@@ -1357,7 +1607,9 @@ class PrivateCrossVPNApp(ctk.CTk):
             font=ctk.CTkFont(size=13, weight="bold"),
             wraplength=700,
         )
-        self._prereq_notice_label.grid(row=0, column=0, padx=12, pady=(10, 6), sticky="ew")
+        self._prereq_notice_label.grid(
+            row=0, column=0, padx=12, pady=(10, 6), sticky="ew"
+        )
 
         self._prereq_notice_btn = ctk.CTkButton(
             self._prereq_notice_card,
@@ -1378,30 +1630,44 @@ class PrivateCrossVPNApp(ctk.CTk):
         card.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         card.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(card, text="Status & Location",
-                      font=ctk.CTkFont(size=15, weight="bold")).grid(
-            row=0, column=0, columnspan=3, padx=14, pady=(10, 6), sticky="w")
+        ctk.CTkLabel(
+            card, text="Status & Location", font=ctk.CTkFont(size=15, weight="bold")
+        ).grid(row=0, column=0, columnspan=3, padx=14, pady=(10, 6), sticky="w")
 
         self._status_label = ctk.CTkLabel(
-            card, text="● Disconnected", font=ctk.CTkFont(size=13), text_color="#e74c3c")
+            card, text="● Disconnected", font=ctk.CTkFont(size=13), text_color="#e74c3c"
+        )
         self._status_label.grid(row=1, column=0, padx=14, pady=3, sticky="w")
 
-        for i, (text, attr) in enumerate([
-            ("IP:", "_ip_val"), ("Location:", "_loc_val"),
-            ("ISP:", "_org_val"), ("Timezone:", "_tz_val"),
-        ], start=2):
-            ctk.CTkLabel(card, text=text, anchor="w").grid(row=i, column=0, padx=(14, 4), pady=1, sticky="w")
+        for i, (text, attr) in enumerate(
+            [
+                ("IP:", "_ip_val"),
+                ("Location:", "_loc_val"),
+                ("ISP:", "_org_val"),
+                ("Timezone:", "_tz_val"),
+            ],
+            start=2,
+        ):
+            ctk.CTkLabel(card, text=text, anchor="w").grid(
+                row=i, column=0, padx=(14, 4), pady=1, sticky="w"
+            )
             lbl = ctk.CTkLabel(card, text="N/A", anchor="w")
             lbl.grid(row=i, column=1, padx=(4, 14), pady=1, sticky="w")
             setattr(self, attr, lbl)
 
-        self._refresh_ip_btn = ctk.CTkButton(card, text="Refresh IP", width=90, command=self._refresh_ip_info)
-        self._refresh_ip_btn.grid(row=2, column=2, rowspan=2, padx=14, pady=3, sticky="e")
+        self._refresh_ip_btn = ctk.CTkButton(
+            card, text="Refresh IP", width=90, command=self._refresh_ip_info
+        )
+        self._refresh_ip_btn.grid(
+            row=2, column=2, rowspan=2, padx=14, pady=3, sticky="e"
+        )
 
         self._uptime_label = ctk.CTkLabel(card, text="Uptime: --:--:--", anchor="e")
         self._uptime_label.grid(row=1, column=2, padx=14, pady=3, sticky="e")
 
-        self._killswitch_info = ctk.CTkLabel(card, text="Kill-Switch: OFF", text_color="gray")
+        self._killswitch_info = ctk.CTkLabel(
+            card, text="Kill-Switch: OFF", text_color="gray"
+        )
         self._killswitch_info.grid(row=4, column=2, padx=14, pady=3, sticky="e")
 
         ctk.CTkLabel(card, text="").grid(row=6, column=0, pady=(0, 6))
@@ -1427,14 +1693,18 @@ class PrivateCrossVPNApp(ctk.CTk):
         ]
         self._wg_entries: dict[str, ctk.CTkEntry] = {}
         for label, key, placeholder, row in wg_fields:
-            ctk.CTkLabel(wg, text=label, anchor="w").grid(row=row, column=0, padx=(8, 4), pady=2, sticky="w")
+            ctk.CTkLabel(wg, text=label, anchor="w").grid(
+                row=row, column=0, padx=(8, 4), pady=2, sticky="w"
+            )
             entry = ctk.CTkEntry(wg, placeholder_text=placeholder)
             entry.grid(row=row, column=1, padx=(4, 8), pady=2, sticky="ew")
             self._wg_entries[key] = entry
 
         wg_btn_frame = ctk.CTkFrame(wg, fg_color="transparent")
         wg_btn_frame.grid(row=9, column=0, columnspan=2, pady=(6, 4))
-        ctk.CTkButton(wg_btn_frame, text="Save Profile", command=self._save_wg_profile).pack(side="left", padx=4)
+        ctk.CTkButton(
+            wg_btn_frame, text="Save Profile", command=self._save_wg_profile
+        ).pack(side="left", padx=4)
 
         # --- OpenVPN tab ---
         ovpn = self._editor_tabview.add("OpenVPN")
@@ -1451,7 +1721,9 @@ class PrivateCrossVPNApp(ctk.CTk):
         ]
         self._ovpn_entries: dict[str, ctk.CTkEntry] = {}
         for label, key, placeholder, row in ovpn_fields:
-            ctk.CTkLabel(ovpn, text=label, anchor="w").grid(row=row, column=0, padx=(8, 4), pady=2, sticky="w")
+            ctk.CTkLabel(ovpn, text=label, anchor="w").grid(
+                row=row, column=0, padx=(8, 4), pady=2, sticky="w"
+            )
             entry = ctk.CTkEntry(ovpn, placeholder_text=placeholder)
             entry.grid(row=row, column=1, padx=(4, 8), pady=2, sticky="ew")
             self._ovpn_entries[key] = entry
@@ -1459,18 +1731,26 @@ class PrivateCrossVPNApp(ctk.CTk):
         # CA / Cert / Key — textbox fields
         cert_row = len(ovpn_fields)
         ctk.CTkLabel(ovpn, text="CA Cert (paste PEM):", anchor="w").grid(
-            row=cert_row, column=0, padx=(8, 4), pady=2, sticky="nw")
+            row=cert_row, column=0, padx=(8, 4), pady=2, sticky="nw"
+        )
         self._ovpn_ca_text = ctk.CTkTextbox(ovpn, height=50)
-        self._ovpn_ca_text.grid(row=cert_row, column=1, padx=(4, 8), pady=2, sticky="ew")
+        self._ovpn_ca_text.grid(
+            row=cert_row, column=1, padx=(4, 8), pady=2, sticky="ew"
+        )
 
         ctk.CTkLabel(ovpn, text="Extra directives:", anchor="w").grid(
-            row=cert_row + 1, column=0, padx=(8, 4), pady=2, sticky="nw")
+            row=cert_row + 1, column=0, padx=(8, 4), pady=2, sticky="nw"
+        )
         self._ovpn_extra_text = ctk.CTkTextbox(ovpn, height=40)
-        self._ovpn_extra_text.grid(row=cert_row + 1, column=1, padx=(4, 8), pady=2, sticky="ew")
+        self._ovpn_extra_text.grid(
+            row=cert_row + 1, column=1, padx=(4, 8), pady=2, sticky="ew"
+        )
 
         ovpn_btn_frame = ctk.CTkFrame(ovpn, fg_color="transparent")
         ovpn_btn_frame.grid(row=cert_row + 2, column=0, columnspan=2, pady=(6, 4))
-        ctk.CTkButton(ovpn_btn_frame, text="Save Profile", command=self._save_ovpn_profile).pack(side="left", padx=4)
+        ctk.CTkButton(
+            ovpn_btn_frame, text="Save Profile", command=self._save_ovpn_profile
+        ).pack(side="left", padx=4)
 
         # --- SSH SOCKS5 tab ---
         ssh = self._editor_tabview.add("SSH SOCKS5")
@@ -1485,7 +1765,9 @@ class PrivateCrossVPNApp(ctk.CTk):
         ]
         self._ssh_entries: dict[str, ctk.CTkEntry] = {}
         for label, key, placeholder, row in ssh_fields:
-            ctk.CTkLabel(ssh, text=label, anchor="w").grid(row=row, column=0, padx=(8, 4), pady=2, sticky="w")
+            ctk.CTkLabel(ssh, text=label, anchor="w").grid(
+                row=row, column=0, padx=(8, 4), pady=2, sticky="w"
+            )
             entry = ctk.CTkEntry(ssh, placeholder_text=placeholder)
             entry.grid(row=row, column=1, padx=(4, 8), pady=2, sticky="ew")
             self._ssh_entries[key] = entry
@@ -1494,16 +1776,23 @@ class PrivateCrossVPNApp(ctk.CTk):
         ssh_key_frame = ctk.CTkFrame(ssh, fg_color="transparent")
         ssh_key_frame.grid(row=5, column=0, columnspan=2, padx=8, pady=2, sticky="ew")
         ssh_key_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(ssh_key_frame, text="SSH Key:", anchor="w").grid(row=0, column=0, padx=(0, 4), sticky="w")
-        self._ssh_key_label = ctk.CTkLabel(ssh_key_frame, text="(none)", text_color="gray", anchor="w")
+        ctk.CTkLabel(ssh_key_frame, text="SSH Key:", anchor="w").grid(
+            row=0, column=0, padx=(0, 4), sticky="w"
+        )
+        self._ssh_key_label = ctk.CTkLabel(
+            ssh_key_frame, text="(none)", text_color="gray", anchor="w"
+        )
         self._ssh_key_label.grid(row=0, column=1, sticky="w")
-        ctk.CTkButton(ssh_key_frame, text="Browse .pem", width=100, command=self._import_ssh_key).grid(
-            row=0, column=2, padx=(8, 0))
+        ctk.CTkButton(
+            ssh_key_frame, text="Browse .pem", width=100, command=self._import_ssh_key
+        ).grid(row=0, column=2, padx=(8, 0))
         self._ssh_key_path: Optional[Path] = None
 
         ssh_btn_frame = ctk.CTkFrame(ssh, fg_color="transparent")
         ssh_btn_frame.grid(row=6, column=0, columnspan=2, pady=(6, 4))
-        ctk.CTkButton(ssh_btn_frame, text="Save Profile", command=self._save_ssh_profile).pack(side="left", padx=4)
+        ctk.CTkButton(
+            ssh_btn_frame, text="Save Profile", command=self._save_ssh_profile
+        ).pack(side="left", padx=4)
 
         # --- Setup Wizard tab ---
         self._build_setup_wizard()
@@ -1535,7 +1824,9 @@ class PrivateCrossVPNApp(ctk.CTk):
         head = ctk.CTkFrame(setup, fg_color="transparent")
         head.grid(row=0, column=0, padx=8, pady=(8, 2), sticky="ew")
         head.grid_columnconfigure(0, weight=1)
-        self._wiz_step_title = ctk.CTkLabel(head, text="", anchor="w", font=ctk.CTkFont(size=14, weight="bold"))
+        self._wiz_step_title = ctk.CTkLabel(
+            head, text="", anchor="w", font=ctk.CTkFont(size=14, weight="bold")
+        )
         self._wiz_step_title.grid(row=0, column=0, sticky="w")
         self._wiz_step_hint = ctk.CTkLabel(head, text="", anchor="w", text_color="gray")
         self._wiz_step_hint.grid(row=1, column=0, sticky="w")
@@ -1564,26 +1855,44 @@ class PrivateCrossVPNApp(ctk.CTk):
         ssh_btn_row = ctk.CTkFrame(step1, fg_color="transparent")
         ssh_btn_row.grid(row=2, column=0, padx=8, pady=(2, 4), sticky="ew")
         self._wiz_ssh_browse_btn = ctk.CTkButton(
-            ssh_btn_row, text="Use Existing Key...", width=150, command=self._wizard_browse_ssh_key)
+            ssh_btn_row,
+            text="Use Existing Key...",
+            width=150,
+            command=self._wizard_browse_ssh_key,
+        )
         self._wiz_ssh_browse_btn.pack(side="left", padx=(0, 8))
         self._wiz_ssh_copy_btn = ctk.CTkButton(
-            ssh_btn_row, text="Copy Public Key", width=130,
-            command=lambda: self._wizard_copy_to_clipboard(self._wizard_ssh_pubkey))
+            ssh_btn_row,
+            text="Copy Public Key",
+            width=130,
+            command=lambda: self._wizard_copy_to_clipboard(self._wizard_ssh_pubkey),
+        )
         self._wiz_ssh_copy_btn.pack(side="left", padx=(0, 8))
 
         ssh_gen_row = ctk.CTkFrame(step1, fg_color="transparent")
         ssh_gen_row.grid(row=3, column=0, padx=8, pady=(0, 8), sticky="ew")
         self._wiz_ssh_gen_btn = ctk.CTkButton(
-            ssh_gen_row, text="Generate New Key", width=150, command=self._wizard_generate_ssh_key)
+            ssh_gen_row,
+            text="Generate New Key",
+            width=150,
+            command=self._wizard_generate_ssh_key,
+        )
         self._wiz_ssh_gen_btn.pack(side="left", padx=(0, 8))
-        ctk.CTkLabel(ssh_gen_row, text="Name:", anchor="w").pack(side="left", padx=(8, 4))
-        self._wiz_ssh_keyname_entry = ctk.CTkEntry(ssh_gen_row, placeholder_text="id_ed25519", width=160)
+        ctk.CTkLabel(ssh_gen_row, text="Name:", anchor="w").pack(
+            side="left", padx=(8, 4)
+        )
+        self._wiz_ssh_keyname_entry = ctk.CTkEntry(
+            ssh_gen_row, placeholder_text="id_ed25519", width=160
+        )
         self._wiz_ssh_keyname_entry.pack(side="left")
 
         self._wiz_provider_var = ctk.StringVar(value="DigitalOcean")
         provider_seg = ctk.CTkSegmentedButton(
-            step2, values=["DigitalOcean", "Azure", "Other"],
-            variable=self._wiz_provider_var, command=self._wizard_on_provider_change)
+            step2,
+            values=["DigitalOcean", "Azure", "Other"],
+            variable=self._wiz_provider_var,
+            command=self._wizard_on_provider_change,
+        )
         provider_seg.grid(row=0, column=0, padx=8, pady=(6, 4), sticky="ew")
         self._wiz_provider_info = ctk.CTkTextbox(step2, height=80, state="disabled")
         self._wiz_provider_info.grid(row=1, column=0, padx=8, pady=(2, 4), sticky="ew")
@@ -1591,30 +1900,46 @@ class PrivateCrossVPNApp(ctk.CTk):
         srv_frame = ctk.CTkFrame(step2, fg_color="transparent")
         srv_frame.grid(row=2, column=0, padx=8, pady=(2, 8), sticky="ew")
         srv_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(srv_frame, text="Server IP:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
+        ctk.CTkLabel(srv_frame, text="Server IP:", anchor="w").grid(
+            row=0, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
         self._wiz_server_ip = ctk.CTkEntry(srv_frame, placeholder_text="203.0.113.10")
         self._wiz_server_ip.grid(row=0, column=1, pady=2, sticky="ew")
-        ctk.CTkLabel(srv_frame, text="SSH User:", anchor="w").grid(row=1, column=0, padx=(0, 4), pady=2, sticky="w")
+        ctk.CTkLabel(srv_frame, text="SSH User:", anchor="w").grid(
+            row=1, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
         self._wiz_ssh_user = ctk.CTkEntry(srv_frame, placeholder_text="root")
         self._wiz_ssh_user.grid(row=1, column=1, pady=2, sticky="ew")
-        ctk.CTkLabel(srv_frame, text="SSH Port:", anchor="w").grid(row=2, column=0, padx=(0, 4), pady=2, sticky="w")
+        ctk.CTkLabel(srv_frame, text="SSH Port:", anchor="w").grid(
+            row=2, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
         self._wiz_ssh_port = ctk.CTkEntry(srv_frame, placeholder_text="22")
         self._wiz_ssh_port.grid(row=2, column=1, pady=2, sticky="ew")
 
         test_row = ctk.CTkFrame(step3, fg_color="transparent")
         test_row.grid(row=0, column=0, padx=8, pady=(6, 2), sticky="ew")
         self._wiz_test_btn = ctk.CTkButton(
-            test_row, text="Test Connection", width=150, command=self._wizard_test_connection)
+            test_row,
+            text="Test Connection",
+            width=150,
+            command=self._wizard_test_connection,
+        )
         self._wiz_test_btn.pack(side="left", padx=(0, 8))
         self._wiz_test_status = ctk.CTkLabel(test_row, text="", anchor="w")
         self._wiz_test_status.pack(side="left", fill="x", expand=True)
-        self._wiz_test_detail = ctk.CTkLabel(step3, text="", anchor="w", font=ctk.CTkFont(size=11), wraplength=700)
+        self._wiz_test_detail = ctk.CTkLabel(
+            step3, text="", anchor="w", font=ctk.CTkFont(size=11), wraplength=700
+        )
         self._wiz_test_detail.grid(row=1, column=0, padx=8, pady=(0, 4), sticky="w")
 
         ssh_cmd_row = ctk.CTkFrame(step3, fg_color="transparent")
         ssh_cmd_row.grid(row=2, column=0, padx=8, pady=(0, 2), sticky="ew")
         self._wiz_copy_ssh_btn = ctk.CTkButton(
-            ssh_cmd_row, text="Copy SSH Command", width=160, command=self._wizard_copy_ssh_command)
+            ssh_cmd_row,
+            text="Copy SSH Command",
+            width=160,
+            command=self._wizard_copy_ssh_command,
+        )
         self._wiz_copy_ssh_btn.pack(side="left", padx=(0, 8))
         self._wiz_ssh_cmd_status = ctk.CTkLabel(ssh_cmd_row, text="", anchor="w")
         self._wiz_ssh_cmd_status.pack(side="left")
@@ -1622,43 +1947,73 @@ class PrivateCrossVPNApp(ctk.CTk):
         setup_row = ctk.CTkFrame(step3, fg_color="transparent")
         setup_row.grid(row=3, column=0, padx=8, pady=(0, 2), sticky="ew")
         self._wiz_initial_setup_btn = ctk.CTkButton(
-            setup_row, text="Run Initial Server Setup", width=190, command=self._wizard_run_initial_server_setup)
+            setup_row,
+            text="Run Initial Server Setup",
+            width=190,
+            command=self._wizard_run_initial_server_setup,
+        )
         self._wiz_initial_setup_btn.pack(side="left", padx=(0, 8))
         self._wiz_initial_setup_status = ctk.CTkLabel(setup_row, text="", anchor="w")
         self._wiz_initial_setup_status.pack(side="left")
 
-        ctk.CTkLabel(step3, text="Run command on server:", anchor="w", font=ctk.CTkFont(size=12)).grid(
-            row=4, column=0, padx=8, pady=(4, 2), sticky="w")
+        ctk.CTkLabel(
+            step3, text="Run command on server:", anchor="w", font=ctk.CTkFont(size=12)
+        ).grid(row=4, column=0, padx=8, pady=(4, 2), sticky="w")
         cmd_row = ctk.CTkFrame(step3, fg_color="transparent")
         cmd_row.grid(row=5, column=0, padx=8, pady=(0, 2), sticky="ew")
         cmd_row.grid_columnconfigure(0, weight=1)
-        self._wiz_remote_cmd = ctk.CTkEntry(cmd_row, placeholder_text="e.g. apt update && apt upgrade -y")
+        self._wiz_remote_cmd = ctk.CTkEntry(
+            cmd_row, placeholder_text="e.g. apt update && apt upgrade -y"
+        )
         self._wiz_remote_cmd.grid(row=0, column=0, sticky="ew", padx=(0, 8))
         self._wiz_remote_run_btn = ctk.CTkButton(
-            cmd_row, text="Run", width=80, command=self._wizard_run_remote_cmd)
+            cmd_row, text="Run", width=80, command=self._wizard_run_remote_cmd
+        )
         self._wiz_remote_run_btn.grid(row=0, column=1)
-        self._wiz_remote_output = ctk.CTkTextbox(step3, height=220, state="disabled",
-            font=ctk.CTkFont(family="Consolas" if self.system.os_type == OSType.WINDOWS else "monospace", size=11))
-        self._wiz_remote_output.grid(row=6, column=0, padx=8, pady=(2, 6), sticky="nsew")
+        self._wiz_remote_output = ctk.CTkTextbox(
+            step3,
+            height=220,
+            state="disabled",
+            font=ctk.CTkFont(
+                family="Consolas"
+                if self.system.os_type == OSType.WINDOWS
+                else "monospace",
+                size=11,
+            ),
+        )
+        self._wiz_remote_output.grid(
+            row=6, column=0, padx=8, pady=(2, 6), sticky="nsew"
+        )
         self._wiz_remote_cmd.bind("<Return>", lambda e: self._wizard_run_remote_cmd())
 
         self._wiz_proto_var = ctk.StringVar(value="WireGuard")
         proto_seg = ctk.CTkSegmentedButton(
-            step4, values=["WireGuard", "OpenVPN", "SSH SOCKS5"],
-            variable=self._wiz_proto_var, command=self._wizard_on_proto_change)
+            step4,
+            values=["WireGuard", "OpenVPN", "SSH SOCKS5"],
+            variable=self._wiz_proto_var,
+            command=self._wizard_on_proto_change,
+        )
         proto_seg.grid(row=0, column=0, padx=8, pady=(6, 4), sticky="ew")
         self._wiz_proto_container = ctk.CTkFrame(step4, fg_color="transparent")
-        self._wiz_proto_container.grid(row=1, column=0, padx=8, pady=(2, 4), sticky="nsew")
+        self._wiz_proto_container.grid(
+            row=1, column=0, padx=8, pady=(2, 4), sticky="nsew"
+        )
         self._wiz_proto_container.grid_columnconfigure(0, weight=1)
 
-        self._wiz_wg_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
+        self._wiz_wg_frame = ctk.CTkFrame(
+            self._wiz_proto_container, fg_color="transparent"
+        )
         self._wiz_wg_frame.grid_columnconfigure(0, weight=1)
         wg_btn_row = ctk.CTkFrame(self._wiz_wg_frame, fg_color="transparent")
         wg_btn_row.grid(row=0, column=0, sticky="w", pady=(0, 4))
         self._wiz_wg_install_btn = ctk.CTkButton(
-            wg_btn_row, text="Install WireGuard on Server", width=220,
-            fg_color="#2980b9", hover_color="#2471a3",
-            command=self._wizard_wg_install_remote)
+            wg_btn_row,
+            text="Install WireGuard on Server",
+            width=220,
+            fg_color="#2980b9",
+            hover_color="#2471a3",
+            command=self._wizard_wg_install_remote,
+        )
         self._wiz_wg_install_btn.pack(side="left", padx=(0, 8))
         self._wiz_wg_install_status = ctk.CTkLabel(wg_btn_row, text="", anchor="w")
         self._wiz_wg_install_status.pack(side="left")
@@ -1670,66 +2025,118 @@ class PrivateCrossVPNApp(ctk.CTk):
             font=ctk.CTkFont(size=11),
         )
         self._wiz_wg_prereq_label.grid(row=1, column=0, sticky="w", pady=(0, 2))
-        ctk.CTkLabel(self._wiz_wg_frame, text="After install completes, keys are fetched automatically. Or paste manually:",
-                      anchor="w", font=ctk.CTkFont(size=11), text_color="gray").grid(
-            row=2, column=0, sticky="w", pady=(0, 4))
+        ctk.CTkLabel(
+            self._wiz_wg_frame,
+            text="After install completes, keys are fetched automatically. Or paste manually:",
+            anchor="w",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+        ).grid(row=2, column=0, sticky="w", pady=(0, 4))
         wg_fields = ctk.CTkFrame(self._wiz_wg_frame, fg_color="transparent")
         wg_fields.grid(row=3, column=0, sticky="ew")
         wg_fields.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(wg_fields, text="Server Public Key:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
-        self._wiz_wg_server_pubkey = ctk.CTkEntry(wg_fields, placeholder_text="Auto-filled or paste server_public.key")
+        ctk.CTkLabel(wg_fields, text="Server Public Key:", anchor="w").grid(
+            row=0, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
+        self._wiz_wg_server_pubkey = ctk.CTkEntry(
+            wg_fields, placeholder_text="Auto-filled or paste server_public.key"
+        )
         self._wiz_wg_server_pubkey.grid(row=0, column=1, pady=2, sticky="ew")
-        ctk.CTkLabel(wg_fields, text="Client Private Key:", anchor="w").grid(row=1, column=0, padx=(0, 4), pady=2, sticky="w")
-        self._wiz_wg_client_privkey = ctk.CTkEntry(wg_fields, placeholder_text="Auto-filled or paste client_private.key")
+        ctk.CTkLabel(wg_fields, text="Client Private Key:", anchor="w").grid(
+            row=1, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
+        self._wiz_wg_client_privkey = ctk.CTkEntry(
+            wg_fields, placeholder_text="Auto-filled or paste client_private.key"
+        )
         self._wiz_wg_client_privkey.grid(row=1, column=1, pady=2, sticky="ew")
-        ctk.CTkLabel(wg_fields, text="Tunnel Address:", anchor="w").grid(row=2, column=0, padx=(0, 4), pady=2, sticky="w")
+        ctk.CTkLabel(wg_fields, text="Tunnel Address:", anchor="w").grid(
+            row=2, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
         self._wiz_wg_address = ctk.CTkEntry(wg_fields, placeholder_text="10.0.0.2/24")
         self._wiz_wg_address.grid(row=2, column=1, pady=2, sticky="ew")
-        ctk.CTkLabel(wg_fields, text="DNS:", anchor="w").grid(row=3, column=0, padx=(0, 4), pady=2, sticky="w")
+        ctk.CTkLabel(wg_fields, text="DNS:", anchor="w").grid(
+            row=3, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
         self._wiz_wg_dns = ctk.CTkEntry(wg_fields, placeholder_text="1.1.1.1")
         self._wiz_wg_dns.grid(row=3, column=1, pady=2, sticky="ew")
 
-        self._wiz_ovpn_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
+        self._wiz_ovpn_frame = ctk.CTkFrame(
+            self._wiz_proto_container, fg_color="transparent"
+        )
         self._wiz_ovpn_frame.grid_columnconfigure(0, weight=1)
         ovpn_btn_row = ctk.CTkFrame(self._wiz_ovpn_frame, fg_color="transparent")
         ovpn_btn_row.grid(row=0, column=0, sticky="w", pady=(0, 4))
         self._wiz_ovpn_install_btn = ctk.CTkButton(
-            ovpn_btn_row, text="Install OpenVPN on Server", width=220,
-            fg_color="#2980b9", hover_color="#2471a3",
-            command=self._wizard_ovpn_install_remote)
+            ovpn_btn_row,
+            text="Install OpenVPN on Server",
+            width=220,
+            fg_color="#2980b9",
+            hover_color="#2471a3",
+            command=self._wizard_ovpn_install_remote,
+        )
         self._wiz_ovpn_install_btn.pack(side="left", padx=(0, 8))
         self._wiz_ovpn_install_status = ctk.CTkLabel(ovpn_btn_row, text="", anchor="w")
         self._wiz_ovpn_install_status.pack(side="left")
-        ctk.CTkLabel(self._wiz_ovpn_frame, text="Or import an existing .ovpn file:", anchor="w",
-                      font=ctk.CTkFont(size=11), text_color="gray").grid(
-            row=1, column=0, sticky="w", pady=(4, 2))
+        ctk.CTkLabel(
+            self._wiz_ovpn_frame,
+            text="Or import an existing .ovpn file:",
+            anchor="w",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+        ).grid(row=1, column=0, sticky="w", pady=(4, 2))
         ovpn_import_row = ctk.CTkFrame(self._wiz_ovpn_frame, fg_color="transparent")
         ovpn_import_row.grid(row=2, column=0, sticky="w", pady=(0, 4))
-        ctk.CTkButton(ovpn_import_row, text="Import .ovpn File", width=150,
-                       command=self._wizard_import_ovpn).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(
+            ovpn_import_row,
+            text="Import .ovpn File",
+            width=150,
+            command=self._wizard_import_ovpn,
+        ).pack(side="left", padx=(0, 8))
         self._wiz_ovpn_file_label = ctk.CTkLabel(
-            ovpn_import_row, text="", anchor="w",
-            font=ctk.CTkFont(size=11), text_color="gray")
+            ovpn_import_row,
+            text="",
+            anchor="w",
+            font=ctk.CTkFont(size=11),
+            text_color="gray",
+        )
         self._wiz_ovpn_file_label.pack(side="left")
 
-        self._wiz_ssh_frame = ctk.CTkFrame(self._wiz_proto_container, fg_color="transparent")
+        self._wiz_ssh_frame = ctk.CTkFrame(
+            self._wiz_proto_container, fg_color="transparent"
+        )
         self._wiz_ssh_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(self._wiz_ssh_frame, text="No server-side setup needed. Just pick a SOCKS port:", anchor="w",
-                      font=ctk.CTkFont(size=12)).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
-        ctk.CTkLabel(self._wiz_ssh_frame, text="SOCKS5 Port:", anchor="w").grid(row=1, column=0, padx=(0, 4), pady=2, sticky="w")
-        self._wiz_socks_port = ctk.CTkEntry(self._wiz_ssh_frame, placeholder_text="1080")
+        ctk.CTkLabel(
+            self._wiz_ssh_frame,
+            text="No server-side setup needed. Just pick a SOCKS port:",
+            anchor="w",
+            font=ctk.CTkFont(size=12),
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 4))
+        ctk.CTkLabel(self._wiz_ssh_frame, text="SOCKS5 Port:", anchor="w").grid(
+            row=1, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
+        self._wiz_socks_port = ctk.CTkEntry(
+            self._wiz_ssh_frame, placeholder_text="1080"
+        )
         self._wiz_socks_port.grid(row=1, column=1, pady=2, sticky="ew")
 
         profile_row = ctk.CTkFrame(step5, fg_color="transparent")
         profile_row.grid(row=0, column=0, padx=8, pady=(6, 8), sticky="ew")
         profile_row.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(profile_row, text="Profile Name:", anchor="w").grid(row=0, column=0, padx=(0, 4), pady=2, sticky="w")
-        self._wiz_profile_name = ctk.CTkEntry(profile_row, placeholder_text="my-vpn-server")
+        ctk.CTkLabel(profile_row, text="Profile Name:", anchor="w").grid(
+            row=0, column=0, padx=(0, 4), pady=2, sticky="w"
+        )
+        self._wiz_profile_name = ctk.CTkEntry(
+            profile_row, placeholder_text="my-vpn-server"
+        )
         self._wiz_profile_name.grid(row=0, column=1, pady=2, sticky="ew")
         self._wiz_create_btn = ctk.CTkButton(
-            profile_row, text="Create Profile", width=140,
-            fg_color="green", hover_color="#2d8a2d",
-            command=self._wizard_create_profile)
+            profile_row,
+            text="Create Profile",
+            width=140,
+            fg_color="green",
+            hover_color="#2d8a2d",
+            command=self._wizard_create_profile,
+        )
         self._wiz_create_btn.grid(row=0, column=2, padx=(8, 0), pady=2)
         self._wiz_result_label = ctk.CTkLabel(step5, text="", anchor="w")
         self._wiz_result_label.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="w")
@@ -1737,11 +2144,15 @@ class PrivateCrossVPNApp(ctk.CTk):
         nav = ctk.CTkFrame(setup, fg_color="transparent")
         nav.grid(row=2, column=0, padx=8, pady=(0, 8), sticky="ew")
         nav.grid_columnconfigure(1, weight=1)
-        self._wiz_prev_btn = ctk.CTkButton(nav, text="Back", width=90, command=self._wizard_prev_step)
+        self._wiz_prev_btn = ctk.CTkButton(
+            nav, text="Back", width=90, command=self._wizard_prev_step
+        )
         self._wiz_prev_btn.grid(row=0, column=0, sticky="w")
         self._wiz_nav_status = ctk.CTkLabel(nav, text="", anchor="w")
         self._wiz_nav_status.grid(row=0, column=1, padx=8, sticky="w")
-        self._wiz_next_btn = ctk.CTkButton(nav, text="Next", width=90, command=self._wizard_next_step)
+        self._wiz_next_btn = ctk.CTkButton(
+            nav, text="Next", width=90, command=self._wizard_next_step
+        )
         self._wiz_next_btn.grid(row=0, column=2, sticky="e")
 
         self.after(300, self._wizard_check_ssh_key)
@@ -1751,9 +2162,15 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._wiz_step_index = 0
         self._wizard_set_step(0)
 
-        self._wiz_server_ip.bind("<KeyRelease>", lambda _e: self._wizard_invalidate_step3())
-        self._wiz_ssh_user.bind("<KeyRelease>", lambda _e: self._wizard_invalidate_step3())
-        self._wiz_ssh_port.bind("<KeyRelease>", lambda _e: self._wizard_invalidate_step3())
+        self._wiz_server_ip.bind(
+            "<KeyRelease>", lambda _e: self._wizard_invalidate_step3()
+        )
+        self._wiz_ssh_user.bind(
+            "<KeyRelease>", lambda _e: self._wizard_invalidate_step3()
+        )
+        self._wiz_ssh_port.bind(
+            "<KeyRelease>", lambda _e: self._wizard_invalidate_step3()
+        )
 
     def _wizard_set_step(self, step_index: int) -> None:
         """Set active wizard step and update title/navigation."""
@@ -1761,18 +2178,26 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._wiz_step_index = step_index
         name = self._wiz_step_order[step_index]
         self._wiz_tabs.set(name)
-        self._wiz_step_title.configure(text=f"Step {step_index + 1}/5 - {name.split('. ', 1)[1]}")
+        self._wiz_step_title.configure(
+            text=f"Step {step_index + 1}/5 - {name.split('. ', 1)[1]}"
+        )
         self._wiz_step_hint.configure(text=self._wiz_step_hints.get(name, ""))
         self._wiz_prev_btn.configure(state="normal" if step_index > 0 else "disabled")
-        self._wiz_next_btn.configure(state="normal" if step_index < len(self._wiz_step_order) - 1 else "disabled")
+        self._wiz_next_btn.configure(
+            state="normal" if step_index < len(self._wiz_step_order) - 1 else "disabled"
+        )
 
     def _wizard_validate_step(self, step_index: int) -> bool:
         """Validate current step before advancing."""
         if step_index == 0 and not self._wizard_ssh_key_path:
-            self._wiz_nav_status.configure(text="Step 1: SSH key is required.", text_color="#e74c3c")
+            self._wiz_nav_status.configure(
+                text="Step 1: SSH key is required.", text_color="#e74c3c"
+            )
             return False
         if step_index == 1 and not self._wiz_server_ip.get().strip():
-            self._wiz_nav_status.configure(text="Step 2: Server IP is required.", text_color="#e74c3c")
+            self._wiz_nav_status.configure(
+                text="Step 2: Server IP is required.", text_color="#e74c3c"
+            )
             return False
         self._wiz_nav_status.configure(text="", text_color="gray")
         return True
@@ -1797,7 +2222,12 @@ class PrivateCrossVPNApp(ctk.CTk):
         """Enable Step 4 WireGuard install only after Step 1-3 prerequisites are complete."""
         has_key = self._wizard_ssh_key_path is not None
         has_server = bool(self._wiz_server_ip.get().strip())
-        ready = has_key and has_server and self._wiz_step3_test_ok and self._wiz_step3_setup_ok
+        ready = (
+            has_key
+            and has_server
+            and self._wiz_step3_test_ok
+            and self._wiz_step3_setup_ok
+        )
 
         self._wiz_wg_install_btn.configure(state="normal" if ready else "disabled")
         if ready:
@@ -1814,8 +2244,9 @@ class PrivateCrossVPNApp(ctk.CTk):
     @staticmethod
     def _wizard_build_header(parent: ctk.CTkFrame, title: str, row: int) -> int:
         """Add a step header label and return the next row."""
-        ctk.CTkLabel(parent, text=title, font=ctk.CTkFont(size=13, weight="bold"), anchor="w").grid(
-            row=row, column=0, padx=8, pady=(10, 2), sticky="w")
+        ctk.CTkLabel(
+            parent, text=title, font=ctk.CTkFont(size=13, weight="bold"), anchor="w"
+        ).grid(row=row, column=0, padx=8, pady=(10, 2), sticky="w")
         return row + 1
 
     # -----------------------------------------------------------------------
@@ -1835,23 +2266,29 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         self._wiz_ssh_status.configure(
             text="No SSH key auto-detected. Use 'Use Existing Key' to browse or 'Generate New Key' to create one.",
-            text_color="#f39c12")
+            text_color="#f39c12",
+        )
 
     def _wizard_load_key(self, priv_path: Path) -> None:
         """Load and display an SSH key pair."""
-        pub_path = priv_path.with_suffix(".pub") if priv_path.suffix != ".pub" else priv_path
+        pub_path = (
+            priv_path.with_suffix(".pub") if priv_path.suffix != ".pub" else priv_path
+        )
         if priv_path.suffix == ".pub":
             priv_path = priv_path.with_suffix("")
 
         if not pub_path.exists():
             self._wiz_ssh_status.configure(
-                text=f"Public key not found: {pub_path}", text_color="#e74c3c")
+                text=f"Public key not found: {pub_path}", text_color="#e74c3c"
+            )
             return
 
         try:
             pubkey = pub_path.read_text(encoding="utf-8").strip()
         except Exception as exc:
-            self._wiz_ssh_status.configure(text=f"Cannot read key: {exc}", text_color="#e74c3c")
+            self._wiz_ssh_status.configure(
+                text=f"Cannot read key: {exc}", text_color="#e74c3c"
+            )
             return
 
         self._wizard_ssh_key_path = priv_path
@@ -1881,12 +2318,14 @@ class PrivateCrossVPNApp(ctk.CTk):
         keygen = shutil.which("ssh-keygen")
         if not keygen:
             self._wiz_ssh_status.configure(
-                text="ssh-keygen not found. Install OpenSSH first.", text_color="#e74c3c")
+                text="ssh-keygen not found. Install OpenSSH first.",
+                text_color="#e74c3c",
+            )
             return
 
         key_name = self._wiz_ssh_keyname_entry.get().strip() or "id_ed25519"
         # Sanitize: only allow filename-safe characters
-        key_name = re.sub(r'[^\w\-.]', '_', key_name)
+        key_name = re.sub(r"[^\w\-.]", "_", key_name)
         ssh_dir = Path.home() / ".ssh"
         ssh_dir.mkdir(parents=True, exist_ok=True)
         key_path = ssh_dir / key_name
@@ -1894,18 +2333,35 @@ class PrivateCrossVPNApp(ctk.CTk):
         if key_path.exists():
             # Key already exists — just load it instead of overwriting
             self._wiz_ssh_status.configure(
-                text=f"Key '{key_name}' already exists — loaded it.", text_color="#f39c12")
+                text=f"Key '{key_name}' already exists — loaded it.",
+                text_color="#f39c12",
+            )
             self._wizard_load_key(key_path)
             return
 
         self._wiz_ssh_gen_btn.configure(state="disabled", text="Generating…")
-        self._wiz_ssh_status.configure(text=f"Generating ~/.ssh/{key_name} …", text_color="gray")
+        self._wiz_ssh_status.configure(
+            text=f"Generating ~/.ssh/{key_name} …", text_color="gray"
+        )
 
         def _worker() -> None:
             try:
                 result = subprocess.run(
-                    [keygen, "-t", "ed25519", "-C", "privatecrossvpn", "-f", str(key_path), "-N", ""],
-                    shell=False, capture_output=True, text=True, timeout=30,
+                    [
+                        keygen,
+                        "-t",
+                        "ed25519",
+                        "-C",
+                        "privatecrossvpn",
+                        "-f",
+                        str(key_path),
+                        "-N",
+                        "",
+                    ],
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
                 )
                 if result.returncode == 0:
                     logger.info("Wizard: SSH key generated at %s", key_path)
@@ -1913,16 +2369,28 @@ class PrivateCrossVPNApp(ctk.CTk):
                 else:
                     err = result.stderr.strip()
                     logger.error("ssh-keygen failed: %s", err)
-                    self.after(0, lambda: self._wiz_ssh_status.configure(
-                        text=f"Generation failed: {err}", text_color="#e74c3c"))
+                    self.after(
+                        0,
+                        lambda: self._wiz_ssh_status.configure(
+                            text=f"Generation failed: {err}", text_color="#e74c3c"
+                        ),
+                    )
             except Exception as exc:
                 error_message = f"Error: {exc}"
                 logger.error("ssh-keygen error: %s", exc)
-                self.after(0, lambda: self._wiz_ssh_status.configure(
-                    text=error_message, text_color="#e74c3c"))
+                self.after(
+                    0,
+                    lambda: self._wiz_ssh_status.configure(
+                        text=error_message, text_color="#e74c3c"
+                    ),
+                )
             finally:
-                self.after(0, lambda: self._wiz_ssh_gen_btn.configure(
-                    state="normal", text="Generate New Key"))
+                self.after(
+                    0,
+                    lambda: self._wiz_ssh_gen_btn.configure(
+                        state="normal", text="Generate New Key"
+                    ),
+                )
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -1961,16 +2429,23 @@ class PrivateCrossVPNApp(ctk.CTk):
         port = self._wiz_ssh_port.get().strip() or "22"
 
         if not ip:
-            self._wiz_test_status.configure(text="Enter a server IP first.", text_color="#e74c3c")
+            self._wiz_test_status.configure(
+                text="Enter a server IP first.", text_color="#e74c3c"
+            )
             return
 
         if not self._wizard_ssh_key_path:
-            self._wiz_test_status.configure(text="Generate or locate an SSH key first (Step 1).", text_color="#e74c3c")
+            self._wiz_test_status.configure(
+                text="Generate or locate an SSH key first (Step 1).",
+                text_color="#e74c3c",
+            )
             return
 
         ssh_bin = shutil.which("ssh")
         if not ssh_bin:
-            self._wiz_test_status.configure(text="ssh binary not found.", text_color="#e74c3c")
+            self._wiz_test_status.configure(
+                text="ssh binary not found.", text_color="#e74c3c"
+            )
             return
 
         self._wiz_test_btn.configure(state="disabled", text="Testing…")
@@ -1982,48 +2457,78 @@ class PrivateCrossVPNApp(ctk.CTk):
                 result = subprocess.run(
                     [
                         ssh_bin,
-                        "-o", "BatchMode=yes",
-                        "-o", "ConnectTimeout=10",
-                        "-o", "StrictHostKeyChecking=accept-new",
-                        "-i", str(self._wizard_ssh_key_path),
-                        "-p", port,
+                        "-o",
+                        "BatchMode=yes",
+                        "-o",
+                        "ConnectTimeout=10",
+                        "-o",
+                        "StrictHostKeyChecking=accept-new",
+                        "-i",
+                        str(self._wizard_ssh_key_path),
+                        "-p",
+                        port,
                         f"{user}@{ip}",
                         "uname -a",
                     ],
-                    shell=False, capture_output=True, text=True, timeout=20,
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=20,
                 )
                 if result.returncode == 0:
                     info = result.stdout.strip()
                     self._wiz_step3_test_ok = True
-                    self.after(0, lambda: self._wiz_test_status.configure(
-                        text="Connected successfully!", text_color="#2ecc71"))
-                    self.after(0, lambda: self._wiz_test_detail.configure(
-                        text=f"Server: {info}"))
+                    self.after(
+                        0,
+                        lambda: self._wiz_test_status.configure(
+                            text="Connected successfully!", text_color="#2ecc71"
+                        ),
+                    )
+                    self.after(
+                        0,
+                        lambda: self._wiz_test_detail.configure(text=f"Server: {info}"),
+                    )
                     self.after(0, self._wizard_refresh_wg_prereq_state)
                     logger.info("Wizard: SSH test OK — %s", info)
                 else:
                     self._wiz_step3_test_ok = False
                     err = result.stderr.strip() or "Connection failed"
-                    self.after(0, lambda: self._wiz_test_status.configure(
-                        text="Connection failed.", text_color="#e74c3c"))
+                    self.after(
+                        0,
+                        lambda: self._wiz_test_status.configure(
+                            text="Connection failed.", text_color="#e74c3c"
+                        ),
+                    )
                     self.after(0, lambda: self._wiz_test_detail.configure(text=err))
                     self.after(0, self._wizard_refresh_wg_prereq_state)
                     logger.warning("Wizard: SSH test failed — %s", err)
             except subprocess.TimeoutExpired:
                 self._wiz_step3_test_ok = False
                 timeout_message = "Connection timed out."
-                self.after(0, lambda: self._wiz_test_status.configure(
-                    text=timeout_message, text_color="#e74c3c"))
+                self.after(
+                    0,
+                    lambda: self._wiz_test_status.configure(
+                        text=timeout_message, text_color="#e74c3c"
+                    ),
+                )
                 self.after(0, self._wizard_refresh_wg_prereq_state)
             except Exception as exc:
                 self._wiz_step3_test_ok = False
                 error_message = f"Error: {exc}"
-                self.after(0, lambda: self._wiz_test_status.configure(
-                    text=error_message, text_color="#e74c3c"))
+                self.after(
+                    0,
+                    lambda: self._wiz_test_status.configure(
+                        text=error_message, text_color="#e74c3c"
+                    ),
+                )
                 self.after(0, self._wizard_refresh_wg_prereq_state)
             finally:
-                self.after(0, lambda: self._wiz_test_btn.configure(
-                    state="normal", text="Test Connection"))
+                self.after(
+                    0,
+                    lambda: self._wiz_test_btn.configure(
+                        state="normal", text="Test Connection"
+                    ),
+                )
 
         threading.Thread(target=_worker, daemon=True).start()
 
@@ -2034,10 +2539,15 @@ class PrivateCrossVPNApp(ctk.CTk):
         port = self._wiz_ssh_port.get().strip() or "22"
 
         if not ip:
-            self._wiz_ssh_cmd_status.configure(text="Enter a server IP in Step 2.", text_color="#e74c3c")
+            self._wiz_ssh_cmd_status.configure(
+                text="Enter a server IP in Step 2.", text_color="#e74c3c"
+            )
             return None
         if not self._wizard_ssh_key_path:
-            self._wiz_ssh_cmd_status.configure(text="Generate or locate an SSH key first (Step 1).", text_color="#e74c3c")
+            self._wiz_ssh_cmd_status.configure(
+                text="Generate or locate an SSH key first (Step 1).",
+                text_color="#e74c3c",
+            )
             return None
 
         return build_ssh_login_command(self._wizard_ssh_key_path, ip, user, port)
@@ -2048,18 +2558,22 @@ class PrivateCrossVPNApp(ctk.CTk):
         if not command:
             return
         self._wizard_copy_to_clipboard(command)
-        self._wiz_ssh_cmd_status.configure(text="SSH command copied to clipboard.", text_color="#2ecc71")
+        self._wiz_ssh_cmd_status.configure(
+            text="SSH command copied to clipboard.", text_color="#2ecc71"
+        )
 
     def _wizard_run_initial_server_setup(self) -> None:
         """Run initial server setup on remote host via SSH."""
         self._wiz_initial_setup_btn.configure(state="disabled", text="Running...")
-        self._wiz_initial_setup_status.configure(text="Applying initial server setup...", text_color="#f39c12")
+        self._wiz_initial_setup_status.configure(
+            text="Applying initial server setup...", text_color="#f39c12"
+        )
 
         setup_cmd = (
             "export DEBIAN_FRONTEND=noninteractive && "
             "apt update && apt upgrade -y && "
             "ufw allow OpenSSH && ufw --force enable && "
-            "id -u vpnuser >/dev/null 2>&1 || adduser --disabled-password --gecos \"\" vpnuser && "
+            'id -u vpnuser >/dev/null 2>&1 || adduser --disabled-password --gecos "" vpnuser && '
             "usermod -aG sudo vpnuser"
         )
 
@@ -2070,10 +2584,14 @@ class PrivateCrossVPNApp(ctk.CTk):
             self._wiz_remote_output.configure(state="disabled")
 
         def _on_done(rc: int, stdout: str, stderr: str) -> None:
-            self._wiz_initial_setup_btn.configure(state="normal", text="Run Initial Server Setup")
+            self._wiz_initial_setup_btn.configure(
+                state="normal", text="Run Initial Server Setup"
+            )
             self._wiz_step3_setup_ok = rc == 0
             self._wiz_initial_setup_status.configure(
-                text="Initial server setup completed." if rc == 0 else f"Setup failed (exit {rc}).",
+                text="Initial server setup completed."
+                if rc == 0
+                else f"Setup failed (exit {rc}).",
                 text_color="#2ecc71" if rc == 0 else "#e74c3c",
             )
             self._wizard_refresh_wg_prereq_state()
@@ -2087,7 +2605,9 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._wiz_remote_output.insert("1.0", "$ Running initial server setup...\n")
         self._wiz_remote_output.configure(state="disabled")
 
-        self._wizard_ssh_exec(setup_cmd, on_output=_on_output, on_done=_on_done, timeout=120)
+        self._wizard_ssh_exec(
+            setup_cmd, on_output=_on_output, on_done=_on_done, timeout=120
+        )
 
     # -----------------------------------------------------------------------
     # Wizard — Remote Command Execution
@@ -2100,10 +2620,14 @@ class PrivateCrossVPNApp(ctk.CTk):
         port = self._wiz_ssh_port.get().strip() or "22"
 
         if not ip:
-            self._wiz_test_status.configure(text="Enter server IP in Step 2.", text_color="#e74c3c")
+            self._wiz_test_status.configure(
+                text="Enter server IP in Step 2.", text_color="#e74c3c"
+            )
             return None
         if not self._wizard_ssh_key_path:
-            self._wiz_test_status.configure(text="Set up an SSH key in Step 1.", text_color="#e74c3c")
+            self._wiz_test_status.configure(
+                text="Set up an SSH key in Step 1.", text_color="#e74c3c"
+            )
             return None
 
         ssh_bin = shutil.which("ssh")
@@ -2113,11 +2637,16 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         return [
             ssh_bin,
-            "-o", "BatchMode=yes",
-            "-o", "ConnectTimeout=15",
-            "-o", "StrictHostKeyChecking=accept-new",
-            "-i", str(self._wizard_ssh_key_path),
-            "-p", port,
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=15",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-i",
+            str(self._wizard_ssh_key_path),
+            "-p",
+            port,
             f"{user}@{ip}",
         ]
 
@@ -2145,8 +2674,11 @@ class PrivateCrossVPNApp(ctk.CTk):
         def _worker() -> None:
             try:
                 proc = subprocess.Popen(
-                    args, shell=False,
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                    args,
+                    shell=False,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
                 )
                 stdout_lines: list[str] = []
                 if proc.stdout:
@@ -2207,7 +2739,9 @@ class PrivateCrossVPNApp(ctk.CTk):
     def _wizard_wg_install_remote(self) -> None:
         """Install WireGuard on the remote server, generate keys, and fetch them back."""
         self._wiz_wg_install_btn.configure(state="disabled", text="Installing…")
-        self._wiz_wg_install_status.configure(text="Installing WireGuard…", text_color="#f39c12")
+        self._wiz_wg_install_status.configure(
+            text="Installing WireGuard…", text_color="#f39c12"
+        )
 
         client_address = self._wiz_wg_address.get().strip() or "10.0.0.2/24"
         client_ip = "10.0.0.2"
@@ -2230,7 +2764,7 @@ class PrivateCrossVPNApp(ctk.CTk):
             "wg genkey | tee client_private.key | wg pubkey > client_public.key && "
             "SERVER_PRIV=$(cat server_private.key) && CLIENT_PUB=$(cat client_public.key) && "
             "EXT_IF=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i==\"dev\") {print $(i+1); exit}}') && "
-            "[ -n \"$EXT_IF\" ] || EXT_IF=eth0 && "
+            '[ -n "$EXT_IF" ] || EXT_IF=eth0 && '
             "cat > /etc/wireguard/wg0.conf <<EOF\n"
             "[Interface]\n"
             "PrivateKey = $SERVER_PRIV\n"
@@ -2265,11 +2799,15 @@ class PrivateCrossVPNApp(ctk.CTk):
             self._wiz_remote_output.configure(state="disabled")
 
         def _on_done(rc: int, stdout: str, stderr: str) -> None:
-            self._wiz_wg_install_btn.configure(state="normal", text="Install WireGuard on Server")
+            self._wiz_wg_install_btn.configure(
+                state="normal", text="Install WireGuard on Server"
+            )
 
             if rc != 0:
                 self._wiz_wg_install_status.configure(
-                    text=f"Install failed (exit {rc}). Check output above.", text_color="#e74c3c")
+                    text=f"Install failed (exit {rc}). Check output above.",
+                    text_color="#e74c3c",
+                )
                 if stderr:
                     self._wiz_remote_output.configure(state="normal")
                     self._wiz_remote_output.insert("end", stderr + "\n")
@@ -2296,23 +2834,33 @@ class PrivateCrossVPNApp(ctk.CTk):
                 self._wiz_wg_client_privkey.delete(0, "end")
                 self._wiz_wg_client_privkey.insert(0, client_privkey)
                 self._wiz_wg_install_status.configure(
-                    text="WireGuard server configured. Keys auto-filled below.", text_color="#2ecc71")
+                    text="WireGuard server configured. Keys auto-filled below.",
+                    text_color="#2ecc71",
+                )
                 logger.info("Wizard: WireGuard server configured, keys fetched.")
             else:
                 self._wiz_wg_install_status.configure(
-                    text="Installed but couldn't parse keys. Paste them manually.", text_color="#f39c12")
+                    text="Installed but couldn't parse keys. Paste them manually.",
+                    text_color="#f39c12",
+                )
 
         self._wiz_remote_output.configure(state="normal")
         self._wiz_remote_output.delete("1.0", "end")
-        self._wiz_remote_output.insert("1.0", "$ Installing WireGuard & generating keys…\n")
+        self._wiz_remote_output.insert(
+            "1.0", "$ Installing WireGuard & generating keys…\n"
+        )
         self._wiz_remote_output.configure(state="disabled")
 
-        self._wizard_ssh_exec(install_cmd, on_output=_on_output, on_done=_on_done, timeout=120)
+        self._wizard_ssh_exec(
+            install_cmd, on_output=_on_output, on_done=_on_done, timeout=120
+        )
 
     def _wizard_ovpn_install_remote(self) -> None:
         """Install OpenVPN on the remote server using the non-interactive script."""
         self._wiz_ovpn_install_btn.configure(state="disabled", text="Installing…")
-        self._wiz_ovpn_install_status.configure(text="Installing OpenVPN (this takes 1-2 min)…", text_color="#f39c12")
+        self._wiz_ovpn_install_status.configure(
+            text="Installing OpenVPN (this takes 1-2 min)…", text_color="#f39c12"
+        )
 
         ip = self._wiz_server_ip.get().strip()
         # Non-interactive OpenVPN install
@@ -2342,11 +2890,14 @@ class PrivateCrossVPNApp(ctk.CTk):
             self._wiz_remote_output.configure(state="disabled")
 
         def _on_done(rc: int, stdout: str, stderr: str) -> None:
-            self._wiz_ovpn_install_btn.configure(state="normal", text="Install OpenVPN on Server")
+            self._wiz_ovpn_install_btn.configure(
+                state="normal", text="Install OpenVPN on Server"
+            )
 
             if rc != 0 and not ovpn_content:
                 self._wiz_ovpn_install_status.configure(
-                    text=f"Install failed (exit {rc}).", text_color="#e74c3c")
+                    text=f"Install failed (exit {rc}).", text_color="#e74c3c"
+                )
                 return
 
             if ovpn_content:
@@ -2356,21 +2907,28 @@ class PrivateCrossVPNApp(ctk.CTk):
                 dest.write_text(ovpn_text, encoding="utf-8")
                 self._wiz_ovpn_import_path = dest
                 self._wiz_ovpn_file_label.configure(
-                    text=f"Downloaded: {dest.name}", text_color="#2ecc71")
+                    text=f"Downloaded: {dest.name}", text_color="#2ecc71"
+                )
                 self._wiz_ovpn_install_status.configure(
-                    text="Installed! Config downloaded.", text_color="#2ecc71")
+                    text="Installed! Config downloaded.", text_color="#2ecc71"
+                )
                 logger.info("Wizard: OpenVPN installed, config saved to %s", dest)
             else:
                 self._wiz_ovpn_install_status.configure(
                     text="Installed but couldn't download config. Use 'Import .ovpn File' manually.",
-                    text_color="#f39c12")
+                    text_color="#f39c12",
+                )
 
         self._wiz_remote_output.configure(state="normal")
         self._wiz_remote_output.delete("1.0", "end")
-        self._wiz_remote_output.insert("1.0", "$ Installing OpenVPN (non-interactive)…\n")
+        self._wiz_remote_output.insert(
+            "1.0", "$ Installing OpenVPN (non-interactive)…\n"
+        )
         self._wiz_remote_output.configure(state="disabled")
 
-        self._wizard_ssh_exec(install_cmd, on_output=_on_output, on_done=_on_done, timeout=180)
+        self._wizard_ssh_exec(
+            install_cmd, on_output=_on_output, on_done=_on_done, timeout=180
+        )
 
     def _wizard_on_proto_change(self, proto: str) -> None:
         """Show/hide protocol-specific frames."""
@@ -2385,7 +2943,9 @@ class PrivateCrossVPNApp(ctk.CTk):
             self._wiz_ssh_frame.grid(row=0, column=0, sticky="ew")
 
         # Auto-fill profile name
-        provider = self._wiz_provider_var.get().lower().replace(" ", "").replace("/", "")
+        provider = (
+            self._wiz_provider_var.get().lower().replace(" ", "").replace("/", "")
+        )
         proto_short = proto.lower().replace(" ", "-")
         suggested = f"{provider}-{proto_short}"
         self._wiz_profile_name.delete(0, "end")
@@ -2395,17 +2955,22 @@ class PrivateCrossVPNApp(ctk.CTk):
         """Import an .ovpn file for the OpenVPN wizard path."""
         path = filedialog.askopenfilename(
             title="Import .ovpn Configuration",
-            filetypes=[("OpenVPN Config", "*.ovpn"), ("All Files", "*.*")])
+            filetypes=[("OpenVPN Config", "*.ovpn"), ("All Files", "*.*")],
+        )
         if path:
             self._wiz_ovpn_import_path = Path(path)
-            self._wiz_ovpn_file_label.configure(text=f"Imported: {Path(path).name}", text_color="#2ecc71")
+            self._wiz_ovpn_file_label.configure(
+                text=f"Imported: {Path(path).name}", text_color="#2ecc71"
+            )
             logger.info("Wizard: Imported .ovpn file: %s", path)
 
     def _wizard_create_profile(self) -> None:
         """Assemble wizard data into a profile and save it."""
         name = self._wiz_profile_name.get().strip()
         if not name:
-            self._wiz_result_label.configure(text="Enter a profile name.", text_color="#e74c3c")
+            self._wiz_result_label.configure(
+                text="Enter a profile name.", text_color="#e74c3c"
+            )
             return
 
         proto = self._wiz_proto_var.get()
@@ -2421,7 +2986,9 @@ class PrivateCrossVPNApp(ctk.CTk):
 
             if not server_pubkey or not client_privkey:
                 self._wiz_result_label.configure(
-                    text="Server public key and client private key are required.", text_color="#e74c3c")
+                    text="Server public key and client private key are required.",
+                    text_color="#e74c3c",
+                )
                 return
 
             endpoint = f"{ip}:51820" if ip else ""
@@ -2443,7 +3010,8 @@ class PrivateCrossVPNApp(ctk.CTk):
             ovpn_path = getattr(self, "_wiz_ovpn_import_path", None)
             if not ovpn_path or not ovpn_path.exists():
                 self._wiz_result_label.configure(
-                    text="Import an .ovpn file first.", text_color="#e74c3c")
+                    text="Import an .ovpn file first.", text_color="#e74c3c"
+                )
                 return
             # Copy to configs dir
             dest = self.settings.configs_dir / ovpn_path.name
@@ -2457,7 +3025,8 @@ class PrivateCrossVPNApp(ctk.CTk):
         elif proto == "SSH SOCKS5":
             if not ip:
                 self._wiz_result_label.configure(
-                    text="Enter the server IP in Step 2.", text_color="#e74c3c")
+                    text="Enter the server IP in Step 2.", text_color="#e74c3c"
+                )
                 return
             socks = self._wiz_socks_port.get().strip() or "1080"
             data = {
@@ -2467,7 +3036,9 @@ class PrivateCrossVPNApp(ctk.CTk):
                 "ssh_port": port,
                 "ssh_user": user,
                 "socks_port": socks,
-                "ssh_key_path": str(self._wizard_ssh_key_path) if self._wizard_ssh_key_path else "",
+                "ssh_key_path": str(self._wizard_ssh_key_path)
+                if self._wizard_ssh_key_path
+                else "",
             }
         else:
             return
@@ -2491,7 +3062,8 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         self._wiz_result_label.configure(
             text=f"Profile '{name}' created! Switch to the sidebar and click Connect.",
-            text_color="#2ecc71")
+            text_color="#2ecc71",
+        )
         logger.info("Wizard: Profile '%s' created (%s).", name, proto)
 
     def _wizard_copy_to_clipboard(self, text: str) -> None:
@@ -2511,13 +3083,23 @@ class PrivateCrossVPNApp(ctk.CTk):
         header = ctk.CTkFrame(frame, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew")
         header.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(header, text="Activity Log", font=ctk.CTkFont(size=13, weight="bold"), anchor="w").grid(
-            row=0, column=0, sticky="w")
-        ctk.CTkButton(header, text="Copy", width=60, command=self._copy_log).grid(row=0, column=1, padx=(0, 6), sticky="e")
-        ctk.CTkButton(header, text="Clear", width=60, command=self._clear_log).grid(row=0, column=2, sticky="e")
+        ctk.CTkLabel(
+            header,
+            text="Activity Log",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w")
+        ctk.CTkButton(header, text="Copy", width=60, command=self._copy_log).grid(
+            row=0, column=1, padx=(0, 6), sticky="e"
+        )
+        ctk.CTkButton(header, text="Clear", width=60, command=self._clear_log).grid(
+            row=0, column=2, sticky="e"
+        )
 
         mono = "Consolas" if self.system.os_type == OSType.WINDOWS else "monospace"
-        self._log_textbox = ctk.CTkTextbox(frame, state="disabled", font=ctk.CTkFont(family=mono, size=11))
+        self._log_textbox = ctk.CTkTextbox(
+            frame, state="disabled", font=ctk.CTkFont(family=mono, size=11)
+        )
         self._log_textbox.grid(row=1, column=0, sticky="nsew", pady=(4, 0))
         self._log_textbox.bind("<Control-c>", self._copy_log_event)
         self._log_textbox.bind("<Control-C>", self._copy_log_event)
@@ -2565,10 +3147,14 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         if proto == Protocol.WIREGUARD.value:
             field_map = {
-                "wg_name": "name", "wg_private_key": "wg_private_key",
-                "wg_address": "wg_address", "wg_dns": "wg_dns",
-                "wg_public_key": "wg_public_key", "wg_preshared_key": "wg_preshared_key",
-                "wg_endpoint": "wg_endpoint", "wg_allowed_ips": "wg_allowed_ips",
+                "wg_name": "name",
+                "wg_private_key": "wg_private_key",
+                "wg_address": "wg_address",
+                "wg_dns": "wg_dns",
+                "wg_public_key": "wg_public_key",
+                "wg_preshared_key": "wg_preshared_key",
+                "wg_endpoint": "wg_endpoint",
+                "wg_allowed_ips": "wg_allowed_ips",
                 "wg_keepalive": "wg_keepalive",
             }
             for ui_key, data_key in field_map.items():
@@ -2578,9 +3164,12 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         elif proto == Protocol.OPENVPN.value:
             field_map = {
-                "ovpn_name": "name", "ovpn_remote": "ovpn_remote",
-                "ovpn_port": "ovpn_port", "ovpn_proto": "ovpn_proto",
-                "ovpn_dev": "ovpn_dev", "ovpn_cipher": "ovpn_cipher",
+                "ovpn_name": "name",
+                "ovpn_remote": "ovpn_remote",
+                "ovpn_port": "ovpn_port",
+                "ovpn_proto": "ovpn_proto",
+                "ovpn_dev": "ovpn_dev",
+                "ovpn_cipher": "ovpn_cipher",
                 "ovpn_auth": "ovpn_auth",
             }
             for ui_key, data_key in field_map.items():
@@ -2594,8 +3183,10 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         elif proto == Protocol.SSH_SOCKS5.value:
             field_map = {
-                "ssh_name": "name", "ssh_host": "ssh_host",
-                "ssh_port": "ssh_port", "ssh_user": "ssh_user",
+                "ssh_name": "name",
+                "ssh_host": "ssh_host",
+                "ssh_port": "ssh_port",
+                "ssh_user": "ssh_user",
                 "ssh_socks_port": "socks_port",
             }
             for ui_key, data_key in field_map.items():
@@ -2708,7 +3299,9 @@ class PrivateCrossVPNApp(ctk.CTk):
         else:
             filetypes = [("PEM Key", "*.pem"), ("All Files", "*.*")]
 
-        path = filedialog.askopenfilename(title="Import Configuration", filetypes=filetypes)
+        path = filedialog.askopenfilename(
+            title="Import Configuration", filetypes=filetypes
+        )
         if not path:
             return
 
@@ -2737,14 +3330,18 @@ class PrivateCrossVPNApp(ctk.CTk):
 
     def _import_ssh_key(self) -> None:
         path = filedialog.askopenfilename(
-            title="Select SSH Key", filetypes=[("PEM Key", "*.pem"), ("All Files", "*.*")])
+            title="Select SSH Key",
+            filetypes=[("PEM Key", "*.pem"), ("All Files", "*.*")],
+        )
         if path:
             self._ssh_key_path = Path(path)
             self._ssh_key_label.configure(text=Path(path).name)
             logger.info("SSH key selected: %s", path)
 
     def _change_configs_dir(self) -> None:
-        d = filedialog.askdirectory(title="Select Configs Folder", initialdir=str(self.settings.configs_dir))
+        d = filedialog.askdirectory(
+            title="Select Configs Folder", initialdir=str(self.settings.configs_dir)
+        )
         if d:
             self.settings.configs_dir = Path(d)
             self._configs_dir_label.configure(text=d)
@@ -2787,11 +3384,15 @@ class PrivateCrossVPNApp(ctk.CTk):
             profile.ssh_host = self._ssh_entries["ssh_host"].get().strip()
             profile.ssh_user = self._ssh_entries["ssh_user"].get().strip()
             try:
-                profile.ssh_port = int(self._ssh_entries["ssh_port"].get().strip() or "22")
+                profile.ssh_port = int(
+                    self._ssh_entries["ssh_port"].get().strip() or "22"
+                )
             except ValueError:
                 profile.ssh_port = 22
             try:
-                profile.socks_port = int(self._ssh_entries["ssh_socks_port"].get().strip() or "1080")
+                profile.socks_port = int(
+                    self._ssh_entries["ssh_socks_port"].get().strip() or "1080"
+                )
             except ValueError:
                 profile.socks_port = 1080
             profile.ssh_key_path = self._ssh_key_path
@@ -2810,7 +3411,10 @@ class PrivateCrossVPNApp(ctk.CTk):
                         "Note: This is required on this PC, not on the droplet."
                     )
             elif self.system.os_type == OSType.WINDOWS:
-                has_wg = self.system.check_binary("wireguard.exe") or Path(r"C:\\Program Files\\WireGuard\\wireguard.exe").exists()
+                has_wg = (
+                    self.system.check_binary("wireguard.exe")
+                    or Path(r"C:\\Program Files\\WireGuard\\wireguard.exe").exists()
+                )
                 if not has_wg:
                     return (
                         "WireGuard client is missing on your local machine.\n\n"
@@ -2832,7 +3436,8 @@ class PrivateCrossVPNApp(ctk.CTk):
                 has_ovpn = self.system.check_binary("openvpn")
                 if not has_ovpn:
                     has_ovpn = any(
-                        Path(p).exists() for p in (
+                        Path(p).exists()
+                        for p in (
                             r"C:\\Program Files\\OpenVPN\\bin\\openvpn.exe",
                             r"C:\\Program Files (x86)\\OpenVPN\\bin\\openvpn.exe",
                         )
@@ -2885,7 +3490,10 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         if profile.protocol in (Protocol.WIREGUARD, Protocol.OPENVPN):
             if not profile.config_path or not profile.config_path.exists():
-                messagebox.showerror("Error", "No valid config. Fill in the fields and save, or import a file.")
+                messagebox.showerror(
+                    "Error",
+                    "No valid config. Fill in the fields and save, or import a file.",
+                )
                 return
         elif profile.protocol == Protocol.SSH_SOCKS5:
             if not profile.ssh_host:
@@ -2897,9 +3505,13 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._update_state(TunnelState.CONNECTING)
         self._connect_start_time = time.time()
 
-        threading.Thread(target=self._connect_worker, args=(profile,), daemon=True).start()
+        threading.Thread(
+            target=self._connect_worker, args=(profile,), daemon=True
+        ).start()
 
-    def _install_missing_local_dependencies_then_connect(self, profile: ConnectionProfile) -> None:
+    def _install_missing_local_dependencies_then_connect(
+        self, profile: ConnectionProfile
+    ) -> None:
         try:
             missing = self._missing_local_dependency_items()
             has_pkexec = shutil.which("pkexec") is not None
@@ -2913,26 +3525,40 @@ class PrivateCrossVPNApp(ctk.CTk):
             )
 
             if missing and not commands:
-                raise RuntimeError("Automatic installation is not available in this environment.")
+                raise RuntimeError(
+                    "Automatic installation is not available in this environment."
+                )
 
             for command in commands:
                 self.system.run_cmd(command, timeout=600, check=True)
 
             self.after(0, self._stop_prereq_spinner)
-            self.after(0, lambda: self._install_deps_status_text.set("Prerequisites installed successfully. Connecting …"))
+            self.after(
+                0,
+                lambda: self._install_deps_status_text.set(
+                    "Prerequisites installed successfully. Connecting …"
+                ),
+            )
             self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
             self.after(0, self._refresh_prereq_notice)
             self.after(0, self._on_connect)
         except subprocess.TimeoutExpired:
             logger.error("Dependency install timed out")
             self.after(0, self._stop_prereq_spinner)
-            self.after(0, lambda: self._install_deps_status_text.set("Install timed out."))
+            self.after(
+                0, lambda: self._install_deps_status_text.set("Install timed out.")
+            )
             self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
             self.after(0, self._refresh_prereq_notice)
             if self.system.os_type == OSType.WINDOWS:
                 self.after(0, self._show_timeout_retry_dialog)
             else:
-                self.after(0, lambda: messagebox.showerror("Install Failed", "Installation timed out. Please try again."))
+                self.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Install Failed", "Installation timed out. Please try again."
+                    ),
+                )
         except Exception as exc:
             logger.error("Dependency install failed: %s", exc)
             self.after(0, self._stop_prereq_spinner)
@@ -2949,7 +3575,9 @@ class PrivateCrossVPNApp(ctk.CTk):
             if self._kill_switch_var.get():
                 self.security.enable()
 
-            self.reconnect_mgr = ReconnectManager(self.tunnel, on_state_change=self._on_reconnect_state)
+            self.reconnect_mgr = ReconnectManager(
+                self.tunnel, on_state_change=self._on_reconnect_state
+            )
             self.reconnect_mgr.start()
 
             self.after(0, lambda: self._update_state(TunnelState.CONNECTED))
@@ -2961,7 +3589,9 @@ class PrivateCrossVPNApp(ctk.CTk):
             self.after(0, lambda: self._update_state(TunnelState.ERROR))
             self.after(0, lambda: self._connect_btn.configure(state="normal"))
             self.after(0, lambda: self._protocol_menu.configure(state="normal"))
-            self.after(0, lambda e=str(exc): messagebox.showerror("Connection Failed", e))
+            self.after(
+                0, lambda e=str(exc): messagebox.showerror("Connection Failed", e)
+            )
 
     def _on_disconnect(self) -> None:
         self._disconnect_btn.configure(state="disabled")
@@ -2998,11 +3628,16 @@ class PrivateCrossVPNApp(ctk.CTk):
     def _update_state(self, state: TunnelState) -> None:
         self._tunnel_state = state
         colors = {
-            TunnelState.DISCONNECTED: "#e74c3c", TunnelState.CONNECTING: "#f39c12",
-            TunnelState.CONNECTED: "#2ecc71", TunnelState.RECONNECTING: "#f39c12",
-            TunnelState.DISCONNECTING: "#f39c12", TunnelState.ERROR: "#e74c3c",
+            TunnelState.DISCONNECTED: "#e74c3c",
+            TunnelState.CONNECTING: "#f39c12",
+            TunnelState.CONNECTED: "#2ecc71",
+            TunnelState.RECONNECTING: "#f39c12",
+            TunnelState.DISCONNECTING: "#f39c12",
+            TunnelState.ERROR: "#e74c3c",
         }
-        self._status_label.configure(text=f"● {state.value}", text_color=colors.get(state, "gray"))
+        self._status_label.configure(
+            text=f"● {state.value}", text_color=colors.get(state, "gray")
+        )
         ks_on = self._kill_switch_var.get() and state == TunnelState.CONNECTED
         self._killswitch_info.configure(
             text=f"Kill-Switch: {'ON' if ks_on else 'OFF'}",
@@ -3023,6 +3658,7 @@ class PrivateCrossVPNApp(ctk.CTk):
         def _worker() -> None:
             info = fetch_ip_info()
             self.after(0, lambda: self._display_ip(info))
+
         threading.Thread(target=_worker, daemon=True).start()
 
     def _display_ip(self, info: IPInfo) -> None:
@@ -3075,7 +3711,9 @@ class PrivateCrossVPNApp(ctk.CTk):
 
     def _set_prereq_notice_message(self, text: str, *, warning: bool = True) -> None:
         self._prereq_notice_text.set(text)
-        self._prereq_notice_label.configure(text_color="#f39c12" if warning else "#2ecc71")
+        self._prereq_notice_label.configure(
+            text_color="#f39c12" if warning else "#2ecc71"
+        )
 
     def _refresh_prereq_notice(self) -> None:
         missing = self._missing_local_dependency_items()
@@ -3101,7 +3739,9 @@ class PrivateCrossVPNApp(ctk.CTk):
         frame = frames[self._prereq_spinner_index % len(frames)]
         self._prereq_spinner_index += 1
         self._set_prereq_notice_message(f"{text_prefix} [{frame}]", warning=True)
-        self._prereq_spinner_job = self.after(140, lambda: self._tick_prereq_spinner(text_prefix))
+        self._prereq_spinner_job = self.after(
+            140, lambda: self._tick_prereq_spinner(text_prefix)
+        )
 
     def _stop_prereq_spinner(self) -> None:
         if self._prereq_spinner_job:
@@ -3121,14 +3761,18 @@ class PrivateCrossVPNApp(ctk.CTk):
             return missing
 
         if self.system.os_type == OSType.WINDOWS:
-            has_wg = self.system.check_binary("wireguard.exe") or Path(r"C:\Program Files\WireGuard\wireguard.exe").exists()
+            has_wg = (
+                self.system.check_binary("wireguard.exe")
+                or Path(r"C:\Program Files\WireGuard\wireguard.exe").exists()
+            )
             if not has_wg:
                 missing.append("WireGuard")
 
             has_ovpn = self.system.check_binary("openvpn")
             if not has_ovpn:
                 has_ovpn = any(
-                    Path(p).exists() for p in (
+                    Path(p).exists()
+                    for p in (
                         r"C:\Program Files\OpenVPN\bin\openvpn.exe",
                         r"C:\Program Files (x86)\OpenVPN\bin\openvpn.exe",
                     )
@@ -3144,9 +3788,13 @@ class PrivateCrossVPNApp(ctk.CTk):
     def _install_missing_local_dependencies(self) -> None:
         missing = self._missing_local_dependency_items()
         if not missing:
-            self._install_deps_status_text.set("All local prerequisites are already installed.")
+            self._install_deps_status_text.set(
+                "All local prerequisites are already installed."
+            )
             self._refresh_prereq_notice()
-            messagebox.showinfo("Prerequisites", "All local prerequisites are already installed.")
+            messagebox.showinfo(
+                "Prerequisites", "All local prerequisites are already installed."
+            )
             return
 
         if self.system.os_type == OSType.WINDOWS and not self.system.is_admin():
@@ -3157,7 +3805,11 @@ class PrivateCrossVPNApp(ctk.CTk):
             )
             return
 
-        if self.system.os_type == OSType.LINUX and not self.system.is_admin() and not shutil.which("pkexec"):
+        if (
+            self.system.os_type == OSType.LINUX
+            and not self.system.is_admin()
+            and not shutil.which("pkexec")
+        ):
             messagebox.showwarning(
                 "Elevated Privileges Required",
                 "Installing local prerequisites on Linux requires root privileges or pkexec.\n\n"
@@ -3168,7 +3820,9 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._install_deps_btn.configure(state="disabled")
         self._install_deps_status_text.set(f"Installing: {', '.join(missing)} …")
         self._start_prereq_spinner("Installing required components")
-        threading.Thread(target=self._install_missing_local_dependencies_worker, daemon=True).start()
+        threading.Thread(
+            target=self._install_missing_local_dependencies_worker, daemon=True
+        ).start()
 
     def _install_missing_local_dependencies_worker(self) -> None:
         try:
@@ -3184,12 +3838,20 @@ class PrivateCrossVPNApp(ctk.CTk):
             )
 
             if missing and not commands:
-                unsupported = [item for item in missing if self.system.os_type == OSType.WINDOWS and item in {"WireGuard", "OpenVPN"} and not has_winget]
+                unsupported = [
+                    item
+                    for item in missing
+                    if self.system.os_type == OSType.WINDOWS
+                    and item in {"WireGuard", "OpenVPN"}
+                    and not has_winget
+                ]
                 detail = (
-                    "Automatic installation is not available for: " + ", ".join(unsupported) + ".\n\n"
+                    "Automatic installation is not available for: "
+                    + ", ".join(unsupported)
+                    + ".\n\n"
                     "Install Winget or use the official installers, then try again."
-                    if unsupported else
-                    "No automatic install command could be built for the current environment."
+                    if unsupported
+                    else "No automatic install command could be built for the current environment."
                 )
                 raise RuntimeError(detail)
 
@@ -3197,20 +3859,37 @@ class PrivateCrossVPNApp(ctk.CTk):
                 self.system.run_cmd(command, timeout=600, check=True)
 
             self.after(0, self._stop_prereq_spinner)
-            self.after(0, lambda: self._install_deps_status_text.set("Prerequisites installed successfully."))
+            self.after(
+                0,
+                lambda: self._install_deps_status_text.set(
+                    "Prerequisites installed successfully."
+                ),
+            )
             self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
             self.after(0, self._refresh_prereq_notice)
-            self.after(0, lambda: messagebox.showinfo("Prerequisites", "Local prerequisites were installed successfully."))
+            self.after(
+                0,
+                lambda: messagebox.showinfo(
+                    "Prerequisites", "Local prerequisites were installed successfully."
+                ),
+            )
         except subprocess.TimeoutExpired:
             logger.error("Dependency install timed out")
             self.after(0, self._stop_prereq_spinner)
-            self.after(0, lambda: self._install_deps_status_text.set("Install timed out."))
+            self.after(
+                0, lambda: self._install_deps_status_text.set("Install timed out.")
+            )
             self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
             self.after(0, self._refresh_prereq_notice)
             if self.system.os_type == OSType.WINDOWS:
                 self.after(0, self._show_timeout_retry_dialog)
             else:
-                self.after(0, lambda: messagebox.showerror("Install Failed", "Installation timed out. Please try again."))
+                self.after(
+                    0,
+                    lambda: messagebox.showerror(
+                        "Install Failed", "Installation timed out. Please try again."
+                    ),
+                )
         except Exception as exc:
             logger.error("Dependency install failed: %s", exc)
             self.after(0, self._stop_prereq_spinner)
@@ -3238,7 +3917,9 @@ class PrivateCrossVPNApp(ctk.CTk):
 
     def _check_privileges(self) -> None:
         if self.system.os_type == OSType.UNSUPPORTED:
-            messagebox.showwarning("Unsupported OS", "Only Windows 11 and Ubuntu 20.04 are supported.")
+            messagebox.showwarning(
+                "Unsupported OS", "Only Windows 11 and Ubuntu 20.04 are supported."
+            )
             return
         if self.system.os_type == OSType.LINUX and not self.system.is_admin():
             logger.warning("Running WITHOUT elevated privileges.")
@@ -3260,7 +3941,9 @@ class PrivateCrossVPNApp(ctk.CTk):
                         "Some features may require manual authentication.",
                     )
             # Fallback: privileged commands request elevation at runtime.
-            logger.info("Privileged operations will request authentication at runtime (pkexec/sudo).")
+            logger.info(
+                "Privileged operations will request authentication at runtime (pkexec/sudo)."
+            )
 
     def _repair_app_dir_permissions_if_needed(self) -> None:
         """Repair root-owned app data created by previous elevated runs."""
@@ -3297,7 +3980,9 @@ class PrivateCrossVPNApp(ctk.CTk):
 
             uid = os.getuid()
             gid = os.getgid()
-            self.system.run_cmd(["chown", "-R", f"{uid}:{gid}", str(app_dir)], timeout=60, check=True)
+            self.system.run_cmd(
+                ["chown", "-R", f"{uid}:{gid}", str(app_dir)], timeout=60, check=True
+            )
             logger.info("Fixed ownership for %s", app_dir)
         except Exception as exc:
             logger.warning("Could not auto-fix app directory ownership: %s", exc)
@@ -3324,6 +4009,7 @@ class PrivateCrossVPNApp(ctk.CTk):
 # ═══════════════════════════════════════════════════════════════════════════
 #  Entry Point
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 def main() -> None:
     logger.info("Starting %s v%s on %s", APP_NAME, APP_VERSION, platform.platform())

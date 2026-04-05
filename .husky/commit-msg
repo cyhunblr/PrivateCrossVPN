@@ -1,0 +1,71 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+commit_msg_file="$1"
+commit_msg=$(head -n 1 "$commit_msg_file")
+header_pattern='^(feat|fix|refactor|chore|docs|test|build|ci|perf|style|revert)(!)?: .+'
+
+if ! printf '%s' "$commit_msg" | grep -Eq "$header_pattern"; then
+	full_msg=$(cat "$commit_msg_file")
+	lower_msg=$(printf '%s' "$full_msg" | tr '[:upper:]' '[:lower:]')
+
+	inferred_type="chore"
+	if printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(fix|bug|error|hotfix|patch)($|[^a-z])'; then
+		inferred_type="fix"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(feat|feature|add|implement)($|[^a-z])'; then
+		inferred_type="feat"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(refactor|cleanup|restructure)($|[^a-z])'; then
+		inferred_type="refactor"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(docs|readme|documentation)($|[^a-z])'; then
+		inferred_type="docs"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(test|pytest|unit test|integration test)($|[^a-z])'; then
+		inferred_type="test"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(ci|workflow|github actions|pipeline)($|[^a-z])'; then
+		inferred_type="ci"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(build|compile|packag)($|[^a-z])'; then
+		inferred_type="build"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(perf|performance|optimiz)($|[^a-z])'; then
+		inferred_type="perf"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(style|format|lint)($|[^a-z])'; then
+		inferred_type="style"
+	elif printf '%s' "$lower_msg" | grep -Eq '(^|[^a-z])(revert|rollback)($|[^a-z])'; then
+		inferred_type="revert"
+	fi
+
+	subject=$(printf '%s' "$commit_msg" | tr -d '\r' | sed -E 's/^`+//; s/`+$//; s/^[[:space:]]+//; s/[[:space:]]+$//')
+	subject=$(printf '%s' "$subject" | sed -E 's/^[A-Za-z]+(\([^)]+\))?!?:[[:space:]]*//')
+	first_char=$(printf '%s' "$subject" | cut -c1 | tr '[:upper:]' '[:lower:]')
+	rest_chars=$(printf '%s' "$subject" | cut -c2-)
+	normalized_subject="${first_char}${rest_chars}"
+
+	if [ -n "$normalized_subject" ]; then
+		{
+			printf '%s: %s\n' "$inferred_type" "$normalized_subject"
+			tail -n +2 "$commit_msg_file" || true
+		} > "$commit_msg_file.tmp"
+		mv "$commit_msg_file.tmp" "$commit_msg_file"
+		commit_msg=$(head -n 1 "$commit_msg_file")
+	fi
+fi
+
+if ! printf '%s' "$commit_msg" | grep -Eq "$header_pattern"; then
+	cat <<'EOF'
+Invalid commit header format.
+
+Expected: <type>[!]: <description>
+
+Examples:
+	feat: add mobile version sync target
+	fix: parse desktop version correctly
+	refactor!: remove legacy protocol path
+
+Allowed types: feat, fix, refactor, chore, docs, test, build, ci, perf, style, revert
+EOF
+	exit 1
+fi
+
+if [ -x "node_modules/.bin/commitlint" ]; then
+	node_modules/.bin/commitlint --edit "$1"
+else
+	npx -y @commitlint/cli@19.5.0 --edit "$1"
+fi

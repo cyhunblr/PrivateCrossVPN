@@ -1,0 +1,37 @@
+#!/bin/sh
+
+set -e
+
+if [ -x ".venv/bin/python" ]; then
+  export PATH="$(pwd)/.venv/bin:$PATH"
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="python3"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="python"
+else
+  echo "[pre-commit] python not found; skipping version sync"
+  exit 0
+fi
+
+if ! "$PYTHON_BIN" -m ruff --version >/dev/null 2>&1; then
+  cat <<'EOF'
+[pre-commit] Missing Python dev dependency: ruff
+Install development dependencies and retry:
+  .venv/bin/python -m pip install -r requirements-dev.txt
+EOF
+  exit 1
+fi
+
+# Auto-sync tracked version fields before commit, then stage the updates.
+"$PYTHON_BIN" scripts/version_sync.py --write >/dev/null
+
+git add privatecrossvpn.py .github/workflows/release.yml README.md
+if [ -f mobile/pubspec.yaml ]; then
+  git add mobile/pubspec.yaml
+fi
+
+if command -v npx >/dev/null 2>&1 && [ -f package.json ]; then
+  npx lint-staged
+fi

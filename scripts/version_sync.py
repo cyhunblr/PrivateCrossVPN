@@ -95,9 +95,17 @@ def build_targets(repo_root: Path, version: str) -> list[SyncTarget]:
         ),
         SyncTarget(
             path=repo_root / "README.md",
-            pattern=re.compile(r'(\|\s+PrivateCrossVPN v)[0-9]+\.[0-9]+\.[0-9]+(\s+\|)'),
+            pattern=re.compile(
+                r"(\|\s+PrivateCrossVPN v)[0-9]+\.[0-9]+\.[0-9]+(\s+\|)"
+            ),
             replacement=rf"\g<1>{version}\g<2>",
             name="README screenshot version",
+        ),
+        SyncTarget(
+            path=repo_root / "mobile" / "pubspec.yaml",
+            pattern=re.compile(r"(version:\s*)[0-9]+\.[0-9]+\.[0-9]+(\+[0-9]+)?"),
+            replacement=rf"\g<1>{version}\g<2>",
+            name="mobile pubspec version",
         ),
     ]
 
