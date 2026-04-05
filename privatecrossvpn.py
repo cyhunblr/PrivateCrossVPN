@@ -550,8 +550,8 @@ class SystemHandler:
             for args in candidates:
                 try:
                     logger.info("Re-launching with: %s", " ".join(args))
-                    subprocess.Popen(args, shell=False, env=clean_env)
-                    return True
+                    os.execvpe(args[0], args, clean_env)
+                    # execvpe replaces the process — this line is never reached on success.
                 except Exception as exc:
                     logger.error("Elevation with %s failed: %s", args[0], exc)
             logger.error("No suitable elevation tool found (pkexec, sudo).")
@@ -3204,7 +3204,24 @@ class PrivateCrossVPNApp(ctk.CTk):
             return
         if self.system.os_type == OSType.LINUX and not self.system.is_admin():
             logger.warning("Running WITHOUT elevated privileges.")
-            # Keep app in user context; privileged commands request elevation at runtime.
+            if messagebox.askyesno(
+                "Elevated Privileges Required",
+                "Admin/root privileges are needed for VPN tunnels and firewall rules.\n\n"
+                "Restart with elevated privileges?",
+            ):
+                # On Linux, request_elevation() uses os.execvpe which replaces
+                # the current process entirely — it never returns on success.
+                # On Windows, it spawns a new elevated process and returns True.
+                if self.system.request_elevation():
+                    self.destroy()
+                    sys.exit(0)
+                else:
+                    messagebox.showwarning(
+                        "Elevation Failed",
+                        "Could not obtain elevated privileges.\n"
+                        "Some features may require manual authentication.",
+                    )
+            # Fallback: privileged commands request elevation at runtime.
             logger.info("Privileged operations will request authentication at runtime (pkexec/sudo).")
 
     def _repair_app_dir_permissions_if_needed(self) -> None:
