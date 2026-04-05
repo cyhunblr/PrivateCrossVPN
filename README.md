@@ -110,23 +110,47 @@ Or import an existing `.conf` / `.ovpn` file via **Import from File...**.
 
 ## Commit Style
 
-This repo uses Conventional Commits for clearer history and safer AI-generated commits:
+This repo uses [Conventional Commits v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) for clearer history and automated tooling:
 
-- `feat: ...`
-- `fix: ...`
-- `refactor: ...`
-- `chore: ...`
-- `docs: ...`
+**Format:** `<type>[optional scope]: <description>`
 
-When VS Code or Copilot suggests a commit message, keep it in this format instead of a generic summary.
+**Types:** `feat`, `fix`, `refactor`, `chore`, `docs`, `build`, `ci`, `perf`, `style`, `revert`, `test`
 
-To enable the local commit hook:
-
-```bash
-git config core.hooksPath .githooks
-chmod +x .githooks/commit-msg
-chmod +x .githooks/post-commit
+**Examples:**
 ```
+feat: add GitHub Actions release workflow
+fix(vpn): handle missing SSH key path
+refactor: split tunnel connection logic
+chore: update CI dependencies
+docs: update setup instructions
+ci: add commitlint validation to CI pipeline
+```
+
+When VS Code or Copilot suggests a commit message, keep it in this format.
+
+**Local commit validation with commitlint:**
+
+1. Install Node.js dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Enable git hooks:
+   ```bash
+   npm run prepare
+   git config core.hooksPath .githooks
+   ```
+
+3. Commit messages are validated locally and in CI using [commitlint](https://commitlint.js.org/) and [husky](https://typicode.github.io/husky/).
+
+**Breaking Changes:** Use `!` before the colon or add `BREAKING CHANGE:` footer:
+```
+feat!: remove support for older API
+feat: refactor API
+BREAKING CHANGE: old endpoints no longer supported
+```
+
+Per SemVer: `feat:` → minor bump, `fix:` → patch bump, breaking changes → major bump.
 
 ## Version Sync
 

@@ -19,11 +19,17 @@
 - Run lint checks with `python -m ruff check .`; markdown changes should stay compatible with the repository’s markdown linting in CI.
 
 ## Commit Messages
-- Use Conventional Commits for all AI-generated commit suggestions and final commits.
+- Use [Conventional Commits v1.0.0](https://www.conventionalcommits.org/en/v1.0.0/) for all commits.
 - Keep the subject line in the form `type: summary` or `type(scope): summary`.
-- Allowed types are `feat`, `fix`, `refactor`, `chore`, `docs`, `build`, `ci`, `perf`, and `style`.
+- Allowed types are: `feat`, `fix`, `refactor`, `chore`, `docs`, `build`, `ci`, `perf`, `style`, `revert`, `test`.
+- Validation happens locally with commitlint (via `.githooks/commit-msg`) and in CI via `@commitlint/cli`.
+- Examples:
+  - `feat: add GitHub Actions release workflow`
+  - `fix(vpn): handle missing SSH key path`
+  - `ci: refactor CI workflows into modular Python, Markdown, and Mobile jobs`
 - Do not generate generic summaries like `Update files` or `Misc changes`.
-- Prefer the smallest accurate type: documentation goes to `docs:`, and tooling or housekeeping goes to `chore:` unless a more specific type clearly fits.
+- Breaking changes: append `!` before colon or use `BREAKING CHANGE:` footer (triggers major version bump per SemVer).
+- Refer to [Conventional Commits FAQ](https://www.conventionalcommits.org#faq) for edge cases (reverts, accidents, etc).
 
 ## Conventions
 - Use `sudo -E` on Linux so the user Python environment and packages remain available when elevation is required.

@@ -1,24 +1,36 @@
 #!/bin/sh
+# commitlint hook for conventional commits validation
+# See: https://www.conventionalcommits.org/en/v1.0.0/
 
-commit_msg_file="$1"
-commit_msg=$(head -n 1 "$commit_msg_file")
+if command -v npx >/dev/null 2>&1; then
+  npx commitlint --edit "$1"
+elif command -v commitlint >/dev/null 2>&1; then
+  commitlint --edit "$1"
+else
+  # Fallback: manual regex check if commitlint unavailable
+  commit_msg_file="$1"
+  commit_msg=$(head -n 1 "$commit_msg_file")
+  pattern='^(feat|fix|refactor|chore|docs|test|build|ci|perf|style|revert)(\([a-z0-9._-]+\))?: .+'
 
-pattern='^(feat|fix|refactor|chore|docs|test|build|ci|perf|style)(\([a-z0-9._-]+\))?: .+'
+  if printf '%s' "$commit_msg" | grep -Eq "$pattern"; then
+    exit 0
+  fi
 
-if printf '%s' "$commit_msg" | grep -Eq "$pattern"; then
-  exit 0
-fi
-
-cat <<'EOF'
+  cat <<'EOF'
 Invalid commit message format.
 
-Use Conventional Commits, for example:
+Use Conventional Commits: https://www.conventionalcommits.org/en/v1.0.0/
+
+Format: <type>[optional scope]: <description>
+
+Examples:
   feat: add GitHub Actions release workflow
-  fix: handle missing SSH key path
+  fix(vpn): handle missing SSH key path
   refactor: split tunnel connection logic
   chore: update CI dependencies
+  docs: update setup instructions
 
-Allowed types: feat, fix, refactor, chore, docs, test, build, ci, perf, style
+Types: feat, fix, refactor, chore, docs, test, build, ci, perf, style, revert
 EOF
-
-exit 1
+  exit 1
+fi

@@ -24,6 +24,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install commitlint
+        run: |
+          npm install --global @commitlint/cli @commitlint/config-conventional
+
+      - name: Lint commit history
+        run: |
+          commitlint --from origin/main --to HEAD
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

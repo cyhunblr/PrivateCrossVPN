@@ -1,0 +1,18 @@
+{
+  "name": "privatecrossvpn",
+  "version": "1.2.2",
+  "description": "Private cross-platform VPN client",
+  "private": true,
+  "engines": {
+    "node": "^18 || ^20"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "husky": "^9.1.7"
+  },
+  "scripts": {
+    "prepare": "husky install",
+    "commitlint:check": "commitlint --from HEAD~1"
+  }
+}
