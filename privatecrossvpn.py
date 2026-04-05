@@ -144,6 +144,73 @@ def strip_wireguard_dns_directives(conf_text: str) -> str:
     return "\n".join(filtered) + "\n"
 
 
+def build_local_dependency_install_commands(
+    os_type: OSType,
+    missing: list[str],
+    *,
+    elevated: bool,
+    has_pkexec: bool,
+    has_winget: bool,
+) -> list[list[str]]:
+    """Build the command list needed to install missing local prerequisites."""
+    if not missing:
+        return []
+
+    if os_type == OSType.LINUX:
+        packages: list[str] = []
+        package_map = {
+            "WireGuard": "wireguard",
+            "OpenVPN": "openvpn",
+            "OpenSSH Client": "openssh-client",
+        }
+        for item in missing:
+            package = package_map.get(item)
+            if package and package not in packages:
+                packages.append(package)
+
+        if not packages:
+            return []
+
+        if elevated:
+            return [
+                ["apt-get", "update"],
+                ["apt-get", "install", "-y", *packages],
+            ]
+
+        if has_pkexec:
+            package_list = " ".join(packages)
+            return [[
+                "pkexec", "bash", "-lc",
+                f"apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y {package_list}",
+            ]]
+
+        return []
+
+    if os_type == OSType.WINDOWS:
+        commands: list[list[str]] = []
+        if "OpenSSH Client" in missing:
+            commands.append([
+                "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                "Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
+            ])
+
+        if has_winget:
+            if "WireGuard" in missing:
+                commands.append([
+                    "winget", "install", "-e", "--id", "WireGuard.WireGuard",
+                    "--accept-package-agreements", "--accept-source-agreements",
+                ])
+            if "OpenVPN" in missing:
+                commands.append([
+                    "winget", "install", "-e", "--id", "OpenVPNTechnologies.OpenVPN",
+                    "--accept-package-agreements", "--accept-source-agreements",
+                ])
+
+        return commands
+
+    return []
+
+
 @dataclass
 class IPInfo:
     ip: str = "N/A"
@@ -1042,6 +1109,10 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._tunnel_state = TunnelState.DISCONNECTED
         self._ip_info = IPInfo()
         self._kill_switch_var = ctk.BooleanVar(value=False)
+        self._install_deps_status_text = ctk.StringVar(value="")
+        self._prereq_notice_text = ctk.StringVar(value="")
+        self._prereq_spinner_index = 0
+        self._prereq_spinner_job: Optional[str] = None
 
         # Wizard state
         self._wizard_ssh_key_path: Optional[Path] = None
@@ -1062,6 +1133,7 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._check_privileges()
         self._poll_log_queue()
         self._refresh_ip_info()
+        self._refresh_prereq_notice()
         self._load_profile_list()
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -1183,7 +1255,10 @@ class PrivateCrossVPNApp(ctk.CTk):
         main = ctk.CTkFrame(self, fg_color="transparent")
         main.grid(row=0, column=1, padx=16, pady=16, sticky="nsew")
         main.grid_columnconfigure(0, weight=1)
-        main.grid_rowconfigure(2, weight=1)  # Log expands
+        main.grid_rowconfigure(3, weight=1)  # Log expands
+
+        # --- Startup prerequisite notice ---
+        self._build_prereq_notice(main)
 
         # --- Status & Location card ---
         self._build_status_card(main)
@@ -1194,9 +1269,39 @@ class PrivateCrossVPNApp(ctk.CTk):
         # --- Activity Log ---
         self._build_log_area(main)
 
+    def _build_prereq_notice(self, parent: ctk.CTkFrame) -> None:
+        self._prereq_notice_card = ctk.CTkFrame(parent)
+        self._prereq_notice_card.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        self._prereq_notice_card.grid_columnconfigure(0, weight=1)
+
+        self._prereq_notice_label = ctk.CTkLabel(
+            self._prereq_notice_card,
+            textvariable=self._prereq_notice_text,
+            anchor="center",
+            justify="center",
+            text_color="#f39c12",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            wraplength=700,
+        )
+        self._prereq_notice_label.grid(row=0, column=0, padx=12, pady=(10, 6), sticky="ew")
+
+        self._prereq_notice_btn = ctk.CTkButton(
+            self._prereq_notice_card,
+            text="Install Required Components",
+            width=240,
+            fg_color="#d35400",
+            hover_color="#ba4a00",
+            command=self._install_missing_local_dependencies,
+        )
+        self._prereq_notice_btn.grid(row=1, column=0, padx=12, pady=(0, 10))
+        # Reuse the existing install flow handlers with the notice button as the single trigger.
+        self._install_deps_btn = self._prereq_notice_btn
+
+        self._prereq_notice_card.grid_remove()
+
     def _build_status_card(self, parent: ctk.CTkFrame) -> None:
         card = ctk.CTkFrame(parent)
-        card.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        card.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         card.grid_columnconfigure(1, weight=1)
 
         ctk.CTkLabel(card, text="Status & Location",
@@ -1229,7 +1334,7 @@ class PrivateCrossVPNApp(ctk.CTk):
 
     def _build_config_editor(self, parent: ctk.CTkFrame) -> None:
         self._editor_tabview = ctk.CTkTabview(parent, height=220)
-        self._editor_tabview.grid(row=1, column=0, sticky="ew", pady=(0, 8))
+        self._editor_tabview.grid(row=2, column=0, sticky="ew", pady=(0, 8))
 
         # --- WireGuard tab ---
         wg = self._editor_tabview.add("WireGuard")
@@ -2325,7 +2430,7 @@ class PrivateCrossVPNApp(ctk.CTk):
 
     def _build_log_area(self, parent: ctk.CTkFrame) -> None:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
-        frame.grid(row=2, column=0, sticky="nsew")
+        frame.grid(row=3, column=0, sticky="nsew")
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_rowconfigure(1, weight=1)
 
@@ -2688,7 +2793,20 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         dep_error = self._local_dependency_error(profile)
         if dep_error:
-            messagebox.showerror("Local Dependency Missing", dep_error)
+            if messagebox.askyesno(
+                "Local Dependency Missing",
+                dep_error + "\n\nInstall the missing prerequisites automatically now?",
+            ):
+                self._install_deps_btn.configure(state="disabled")
+                self._install_deps_status_text.set("Installing missing prerequisites …")
+                self._start_prereq_spinner("Installing required components")
+                threading.Thread(
+                    target=self._install_missing_local_dependencies_then_connect,
+                    args=(profile,),
+                    daemon=True,
+                ).start()
+            else:
+                messagebox.showerror("Local Dependency Missing", dep_error)
             return
 
         if profile.protocol in (Protocol.WIREGUARD, Protocol.OPENVPN):
@@ -2706,6 +2824,38 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._connect_start_time = time.time()
 
         threading.Thread(target=self._connect_worker, args=(profile,), daemon=True).start()
+
+    def _install_missing_local_dependencies_then_connect(self, profile: ConnectionProfile) -> None:
+        try:
+            missing = self._missing_local_dependency_items()
+            has_pkexec = shutil.which("pkexec") is not None
+            has_winget = self.system.check_binary("winget") is not None
+            commands = build_local_dependency_install_commands(
+                self.system.os_type,
+                missing,
+                elevated=self.system.is_admin(),
+                has_pkexec=has_pkexec,
+                has_winget=has_winget,
+            )
+
+            if missing and not commands:
+                raise RuntimeError("Automatic installation is not available in this environment.")
+
+            for command in commands:
+                self.system.run_cmd(command, timeout=600, check=True)
+
+            self.after(0, self._stop_prereq_spinner)
+            self.after(0, lambda: self._install_deps_status_text.set("Prerequisites installed successfully. Connecting …"))
+            self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
+            self.after(0, self._refresh_prereq_notice)
+            self.after(0, self._on_connect)
+        except Exception as exc:
+            logger.error("Dependency install failed: %s", exc)
+            self.after(0, self._stop_prereq_spinner)
+            self.after(0, lambda: self._install_deps_status_text.set("Install failed."))
+            self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
+            self.after(0, self._refresh_prereq_notice)
+            self.after(0, lambda e=str(exc): messagebox.showerror("Install Failed", e))
 
     def _connect_worker(self, profile: ConnectionProfile) -> None:
         try:
@@ -2839,6 +2989,142 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._copy_log()
         return "break"
 
+    def _set_prereq_notice_message(self, text: str, *, warning: bool = True) -> None:
+        self._prereq_notice_text.set(text)
+        self._prereq_notice_label.configure(text_color="#f39c12" if warning else "#2ecc71")
+
+    def _refresh_prereq_notice(self) -> None:
+        missing = self._missing_local_dependency_items()
+        if missing:
+            text = "Warning: missing local components: " + ", ".join(missing) + "."
+            self._set_prereq_notice_message(text, warning=True)
+            self._prereq_notice_btn.configure(state="normal")
+            self._prereq_notice_card.grid()
+        else:
+            self._stop_prereq_spinner()
+            self._prereq_notice_card.grid_remove()
+
+    def _start_prereq_spinner(self, text_prefix: str) -> None:
+        self._stop_prereq_spinner()
+        self._prereq_spinner_index = 0
+        self._set_prereq_notice_message(f"{text_prefix} [|]", warning=True)
+        self._prereq_notice_btn.configure(state="disabled")
+        self._prereq_notice_card.grid()
+        self._tick_prereq_spinner(text_prefix)
+
+    def _tick_prereq_spinner(self, text_prefix: str) -> None:
+        frames = ["|", "/", "-", "\\"]
+        frame = frames[self._prereq_spinner_index % len(frames)]
+        self._prereq_spinner_index += 1
+        self._set_prereq_notice_message(f"{text_prefix} [{frame}]", warning=True)
+        self._prereq_spinner_job = self.after(140, lambda: self._tick_prereq_spinner(text_prefix))
+
+    def _stop_prereq_spinner(self) -> None:
+        if self._prereq_spinner_job:
+            self.after_cancel(self._prereq_spinner_job)
+            self._prereq_spinner_job = None
+
+    def _missing_local_dependency_items(self) -> list[str]:
+        missing: list[str] = []
+
+        if self.system.os_type == OSType.LINUX:
+            if not self.system.check_binary("wg-quick"):
+                missing.append("WireGuard")
+            if not self.system.check_binary("openvpn"):
+                missing.append("OpenVPN")
+            if not self.system.check_binary("ssh"):
+                missing.append("OpenSSH Client")
+            return missing
+
+        if self.system.os_type == OSType.WINDOWS:
+            has_wg = self.system.check_binary("wireguard.exe") or Path(r"C:\Program Files\WireGuard\wireguard.exe").exists()
+            if not has_wg:
+                missing.append("WireGuard")
+
+            has_ovpn = self.system.check_binary("openvpn")
+            if not has_ovpn:
+                has_ovpn = any(
+                    Path(p).exists() for p in (
+                        r"C:\Program Files\OpenVPN\bin\openvpn.exe",
+                        r"C:\Program Files (x86)\OpenVPN\bin\openvpn.exe",
+                    )
+                )
+            if not has_ovpn:
+                missing.append("OpenVPN")
+
+            if not self.system.check_binary("ssh"):
+                missing.append("OpenSSH Client")
+
+        return missing
+
+    def _install_missing_local_dependencies(self) -> None:
+        missing = self._missing_local_dependency_items()
+        if not missing:
+            self._install_deps_status_text.set("All local prerequisites are already installed.")
+            self._refresh_prereq_notice()
+            messagebox.showinfo("Prerequisites", "All local prerequisites are already installed.")
+            return
+
+        if self.system.os_type == OSType.WINDOWS and not self.system.is_admin():
+            messagebox.showwarning(
+                "Elevated Privileges Required",
+                "Installing local prerequisites on Windows requires Administrator privileges.\n\n"
+                "Please restart the app as Administrator and try again.",
+            )
+            return
+
+        if self.system.os_type == OSType.LINUX and not self.system.is_admin() and not shutil.which("pkexec"):
+            messagebox.showwarning(
+                "Elevated Privileges Required",
+                "Installing local prerequisites on Linux requires root privileges or pkexec.\n\n"
+                "Please run the app with sudo -E or install pkexec.",
+            )
+            return
+
+        self._install_deps_btn.configure(state="disabled")
+        self._install_deps_status_text.set(f"Installing: {', '.join(missing)} …")
+        self._start_prereq_spinner("Installing required components")
+        threading.Thread(target=self._install_missing_local_dependencies_worker, daemon=True).start()
+
+    def _install_missing_local_dependencies_worker(self) -> None:
+        try:
+            missing = self._missing_local_dependency_items()
+            has_pkexec = shutil.which("pkexec") is not None
+            has_winget = self.system.check_binary("winget") is not None
+            commands = build_local_dependency_install_commands(
+                self.system.os_type,
+                missing,
+                elevated=self.system.is_admin(),
+                has_pkexec=has_pkexec,
+                has_winget=has_winget,
+            )
+
+            if missing and not commands:
+                unsupported = [item for item in missing if self.system.os_type == OSType.WINDOWS and item in {"WireGuard", "OpenVPN"} and not has_winget]
+                detail = (
+                    "Automatic installation is not available for: " + ", ".join(unsupported) + ".\n\n"
+                    "Install Winget or use the official installers, then try again."
+                    if unsupported else
+                    "No automatic install command could be built for the current environment."
+                )
+                raise RuntimeError(detail)
+
+            for command in commands:
+                self.system.run_cmd(command, timeout=600, check=True)
+
+            self.after(0, self._stop_prereq_spinner)
+            self.after(0, lambda: self._install_deps_status_text.set("Prerequisites installed successfully."))
+            self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
+            self.after(0, self._refresh_prereq_notice)
+            self.after(0, lambda: messagebox.showinfo("Prerequisites", "Local prerequisites were installed successfully."))
+        except Exception as exc:
+            logger.error("Dependency install failed: %s", exc)
+            self.after(0, self._stop_prereq_spinner)
+            self.after(0, lambda: self._install_deps_status_text.set("Install failed."))
+            self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
+            self.after(0, self._refresh_prereq_notice)
+            self.after(0, lambda e=str(exc): messagebox.showerror("Install Failed", e))
+
     # -----------------------------------------------------------------------
     # Privilege Check
     # -----------------------------------------------------------------------
@@ -2867,6 +3153,7 @@ class PrivateCrossVPNApp(ctk.CTk):
     def _on_close(self) -> None:
         logger.info("Shutting down …")
         try:
+            self._stop_prereq_spinner()
             if self.reconnect_mgr:
                 self.reconnect_mgr.stop()
             if self.tunnel and self.tunnel.state != TunnelState.DISCONNECTED:

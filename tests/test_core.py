@@ -178,3 +178,47 @@ def test_generate_wireguard_conf_sets_strict_permissions(monkeypatch, tmp_path):
 
     mode = conf.stat().st_mode & 0o777
     assert mode == 0o600
+
+
+def test_build_local_dependency_install_commands_for_linux(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    commands = module.build_local_dependency_install_commands(
+        module.OSType.LINUX,
+        ["WireGuard", "OpenVPN", "OpenSSH Client"],
+        elevated=True,
+        has_pkexec=True,
+        has_winget=False,
+    )
+
+    assert commands == [
+        ["apt-get", "update"],
+        ["apt-get", "install", "-y", "wireguard", "openvpn", "openssh-client"],
+    ]
+
+
+def test_build_local_dependency_install_commands_for_windows(monkeypatch, tmp_path):
+    module = load_module(monkeypatch, tmp_path)
+
+    commands = module.build_local_dependency_install_commands(
+        module.OSType.WINDOWS,
+        ["WireGuard", "OpenVPN", "OpenSSH Client"],
+        elevated=True,
+        has_pkexec=False,
+        has_winget=True,
+    )
+
+    assert commands == [
+        [
+            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+            "Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
+        ],
+        [
+            "winget", "install", "-e", "--id", "WireGuard.WireGuard",
+            "--accept-package-agreements", "--accept-source-agreements",
+        ],
+        [
+            "winget", "install", "-e", "--id", "OpenVPNTechnologies.OpenVPN",
+            "--accept-package-agreements", "--accept-source-agreements",
+        ],
+    ]
