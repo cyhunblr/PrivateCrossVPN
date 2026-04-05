@@ -24,7 +24,7 @@ dependencies:
   dio: ^5.7.0
 
   # SSH SOCKS5
-  dartssh2: ^2.17.0
+  dartssh2: 2.11.0
 
   # State management & navigation
   flutter_riverpod: ^2.6.1
