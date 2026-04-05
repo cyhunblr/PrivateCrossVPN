@@ -1166,7 +1166,8 @@ class PrivateCrossVPNApp(ctk.CTk):
 
         # Core modules
         self.system = SystemHandler()
-        self._repair_app_dir_permissions_if_needed()
+        if self.system.os_type == OSType.LINUX and not self.system.is_admin():
+            self._repair_app_dir_permissions_if_needed()
         self.settings = AppSettings()
         self.profile_mgr = ProfileManager(self.settings)
         self.security = SecurityGuard(self.system)
@@ -3203,8 +3204,6 @@ class PrivateCrossVPNApp(ctk.CTk):
             return
         if self.system.os_type == OSType.LINUX and not self.system.is_admin():
             logger.warning("Running WITHOUT elevated privileges.")
-            self._repair_app_dir_permissions_if_needed()
-
             # Keep app in user context; privileged commands request elevation at runtime.
             logger.info("Privileged operations will request authentication at runtime (pkexec/sudo).")
 
