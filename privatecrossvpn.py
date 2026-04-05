@@ -575,6 +575,7 @@ class SystemHandler:
         capture: bool = True,
         check: bool = False,
     ) -> subprocess.CompletedProcess[str]:
+        args = self._elevate_args_if_needed(args)
         logger.info("CMD> %s", " ".join(args))
         try:
             result = subprocess.run(
@@ -609,11 +610,44 @@ class SystemHandler:
             raise
 
     def popen_cmd(self, args: list[str], **kwargs: Any) -> subprocess.Popen[str]:
+        args = self._elevate_args_if_needed(args)
         logger.info("POPEN> %s", " ".join(args))
         return subprocess.Popen(
             args, shell=False, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, **kwargs,
         )
+
+    def _elevate_args_if_needed(self, args: list[str]) -> list[str]:
+        """Auto-elevate root-required Linux commands at runtime when app runs as normal user."""
+        if self.os_type != OSType.LINUX or self.is_admin() or not args:
+            return args
+
+        first = Path(args[0]).name
+        if first in {"pkexec", "sudo"}:
+            return args
+
+        privileged_bins = {
+            "wg-quick", "wg", "openvpn",
+            "iptables", "ip6tables",
+            "systemctl", "ufw",
+            "apt", "apt-get", "chown",
+        }
+        if first not in privileged_bins:
+            return args
+
+        if shutil.which("pkexec"):
+            elevated = ["pkexec", "env"]
+            for key in ("DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
+                value = os.environ.get(key)
+                if value:
+                    elevated.append(f"{key}={value}")
+            elevated.extend(args)
+            return elevated
+
+        if shutil.which("sudo"):
+            return ["sudo", *args]
+
+        return args
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -3166,18 +3200,27 @@ class PrivateCrossVPNApp(ctk.CTk):
         if self.system.os_type == OSType.UNSUPPORTED:
             messagebox.showwarning("Unsupported OS", "Only Windows 11 and Ubuntu 20.04 are supported.")
             return
-        if not self.system.is_admin():
+        if self.system.os_type == OSType.LINUX and not self.system.is_admin():
             logger.warning("Running WITHOUT elevated privileges.")
-            if messagebox.askyesno(
-                "Elevated Privileges Required",
-                "Admin/root privileges are needed for VPN tunnels and firewall rules.\n\n"
-                "Restart with elevated privileges?",
-            ):
-                if self.system.request_elevation():
-                    self.destroy()
-                    sys.exit(0)
-                else:
-                    messagebox.showwarning("Elevation Failed", "Some features may not work.")
+            self._repair_app_dir_permissions_if_needed()
+
+            # Keep app in user context; privileged commands request elevation at runtime.
+            logger.info("Privileged operations will request authentication at runtime (pkexec/sudo).")
+
+    def _repair_app_dir_permissions_if_needed(self) -> None:
+        """Repair root-owned app directory created by previous elevated runs."""
+        try:
+            app_dir = APP_DIR
+            app_dir.mkdir(parents=True, exist_ok=True)
+            if os.access(app_dir, os.W_OK):
+                return
+
+            uid = os.getuid()
+            gid = os.getgid()
+            self.system.run_cmd(["chown", "-R", f"{uid}:{gid}", str(app_dir)], timeout=60, check=True)
+            logger.info("Fixed ownership for %s", app_dir)
+        except Exception as exc:
+            logger.warning("Could not auto-fix app directory ownership: %s", exc)
 
     # -----------------------------------------------------------------------
     # Shutdown
