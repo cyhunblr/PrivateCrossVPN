@@ -2918,6 +2918,16 @@ class PrivateCrossVPNApp(ctk.CTk):
             self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
             self.after(0, self._refresh_prereq_notice)
             self.after(0, self._on_connect)
+        except subprocess.TimeoutExpired:
+            logger.error("Dependency install timed out")
+            self.after(0, self._stop_prereq_spinner)
+            self.after(0, lambda: self._install_deps_status_text.set("Install timed out."))
+            self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
+            self.after(0, self._refresh_prereq_notice)
+            if self.system.os_type == OSType.WINDOWS:
+                self.after(0, self._show_timeout_retry_dialog)
+            else:
+                self.after(0, lambda: messagebox.showerror("Install Failed", "Installation timed out. Please try again."))
         except Exception as exc:
             logger.error("Dependency install failed: %s", exc)
             self.after(0, self._stop_prereq_spinner)
@@ -3186,6 +3196,16 @@ class PrivateCrossVPNApp(ctk.CTk):
             self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
             self.after(0, self._refresh_prereq_notice)
             self.after(0, lambda: messagebox.showinfo("Prerequisites", "Local prerequisites were installed successfully."))
+        except subprocess.TimeoutExpired:
+            logger.error("Dependency install timed out")
+            self.after(0, self._stop_prereq_spinner)
+            self.after(0, lambda: self._install_deps_status_text.set("Install timed out."))
+            self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
+            self.after(0, self._refresh_prereq_notice)
+            if self.system.os_type == OSType.WINDOWS:
+                self.after(0, self._show_timeout_retry_dialog)
+            else:
+                self.after(0, lambda: messagebox.showerror("Install Failed", "Installation timed out. Please try again."))
         except Exception as exc:
             logger.error("Dependency install failed: %s", exc)
             self.after(0, self._stop_prereq_spinner)
@@ -3193,6 +3213,19 @@ class PrivateCrossVPNApp(ctk.CTk):
             self.after(0, lambda: self._install_deps_btn.configure(state="normal"))
             self.after(0, self._refresh_prereq_notice)
             self.after(0, lambda e=str(exc): messagebox.showerror("Install Failed", e))
+
+    def _show_timeout_retry_dialog(self) -> None:
+        """Show Retry / Exit dialog after a Windows dependency install timeout."""
+        result = messagebox.askretrycancel(
+            "Install Timed Out",
+            "Component installation timed out.\n\n"
+            "Windows Update service may be slow or busy.\n"
+            "Would you like to retry?",
+        )
+        if result:
+            self._install_missing_local_dependencies()
+        else:
+            self.destroy()
 
     # -----------------------------------------------------------------------
     # Privilege Check
