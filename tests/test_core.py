@@ -4,10 +4,14 @@ import importlib
 import logging
 import sys
 from types import SimpleNamespace
+from pathlib import Path
 
 
 def load_module(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
+    repo_root = Path(__file__).resolve().parents[1]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
     logging.getLogger("PrivateCrossVPN").handlers.clear()
     sys.modules.pop("privatecrossvpn", None)
     return importlib.import_module("privatecrossvpn")
