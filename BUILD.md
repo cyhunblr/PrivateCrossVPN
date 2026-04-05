@@ -124,12 +124,12 @@ sudo ./dist/PrivateCrossVPN
 
 - **CI**: `.github/workflows/ci.yml` runs markdown lint, `ruff check .`, and `pytest -q` on pull requests and pushes to all branches.
 - **Release**: `.github/workflows/release.yml` runs only after the CI workflow succeeds on `main`, bumps the patch version automatically, builds a release matrix, creates a `v*` tag, and publishes one GitHub Release containing:
-    - Linux self-hosted `ubuntu-20.04` artifact
-    - Linux GitHub-hosted `ubuntu-22.04` artifact
-    - Linux GitHub-hosted `ubuntu-24.04` artifact
-    - Windows GitHub-hosted `windows-2022` artifact
-    - Windows GitHub-hosted `windows-latest` artifact
-    - Note: GitHub-hosted Windows runners are Windows Server images.
+  - Linux self-hosted `ubuntu-20.04` artifact
+  - Linux GitHub-hosted `ubuntu-22.04` artifact
+  - Linux GitHub-hosted `ubuntu-24.04` artifact
+  - Windows GitHub-hosted `windows-2022` artifact
+  - Windows GitHub-hosted `windows-latest` artifact
+  - Note: GitHub-hosted Windows runners are Windows Server images.
 - **Markdown lint**: CI also runs `markdownlint-cli` against `README.md`, `BUILD.md`, and the docs under `docs/`.
 - **Local dev checks**: `pip install -r requirements-dev.txt` then run `ruff check .` and `pytest -q`.
 
@@ -145,8 +145,7 @@ The CI workflow supports both GitHub-hosted and self-hosted Linux runners.
 
 **Set up a self-hosted Linux runner (one-time):**
 
-1. Open GitHub repository settings:
-    - `Settings` → `Actions` → `Runners` → `New self-hosted runner`
+1. Open GitHub repository settings: `Settings` → `Actions` → `Runners` → `New self-hosted runner`
 2. Choose **Linux** and **x64** architecture.
 3. Copy the generated setup commands from GitHub's page. They will include your unique token and repo URL. Run them on your runner machine:
 
@@ -180,9 +179,7 @@ Runner logs are at `~/actions-runner/_diag/`.
 **Enable self-hosted by default for this repo:**
 
 1. `Settings` → `Secrets and variables` → `Actions` → `Variables`
-2. Add a new repository variable:
-    - Name: `CI_RUNNER_MODE`
-    - Value: `self-hosted`
+2. Add a new repository variable with Name `CI_RUNNER_MODE` and Value `self-hosted`.
 3. Next push will automatically use your self-hosted runner.
 
 **Switch back to GitHub-hosted:**
