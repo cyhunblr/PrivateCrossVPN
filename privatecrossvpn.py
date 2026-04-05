@@ -512,15 +512,43 @@ class SystemHandler:
                 return False
 
         if self.os_type == OSType.LINUX:
-            for cmd in ("pkexec", "sudo"):
-                if shutil.which(cmd):
-                    try:
-                        args = [cmd, sys.executable] + sys.argv
-                        logger.info("Re-launching with: %s", " ".join(args))
-                        subprocess.Popen(args, shell=False)
-                        return True
-                    except Exception as exc:
-                        logger.error("Elevation with %s failed: %s", cmd, exc)
+            # In frozen binaries, sys.executable already points to the app binary.
+            # Passing sys.argv[0] again creates a duplicate path argument.
+            if getattr(sys, "frozen", False):
+                relaunch_target = [sys.executable, *sys.argv[1:]]
+            else:
+                relaunch_target = [sys.executable, *sys.argv]
+
+            candidates: list[list[str]] = []
+            has_tty = False
+            try:
+                has_tty = sys.stdin.isatty()
+            except Exception:
+                has_tty = False
+
+            # Prefer sudo when launched from a terminal so password prompt stays visible.
+            if has_tty and shutil.which("sudo"):
+                candidates.append(["sudo", "-E", *relaunch_target])
+
+            if shutil.which("pkexec"):
+                pkexec_cmd = ["pkexec", "env"]
+                for key in ("DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
+                    value = os.environ.get(key)
+                    if value:
+                        pkexec_cmd.append(f"{key}={value}")
+                pkexec_cmd.extend(relaunch_target)
+                candidates.append(pkexec_cmd)
+
+            if shutil.which("sudo") and not has_tty:
+                candidates.append(["sudo", "-E", *relaunch_target])
+
+            for args in candidates:
+                try:
+                    logger.info("Re-launching with: %s", " ".join(args))
+                    subprocess.Popen(args, shell=False)
+                    return True
+                except Exception as exc:
+                    logger.error("Elevation with %s failed: %s", args[0], exc)
             logger.error("No suitable elevation tool found (pkexec, sudo).")
             return False
 
