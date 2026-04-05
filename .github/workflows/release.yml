@@ -19,8 +19,9 @@ permissions:
 
 jobs:
   version:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-20.04
+    # CI başarılıysa veya manuel tetiklendiyse çalış
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
     outputs:
       release_allowed: ${{ steps.freshness.outputs.release_allowed }}
       version: ${{ steps.bump.outputs.version }}
@@ -71,7 +72,7 @@ jobs:
 
   build-windows:
     needs: version
-    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.version.outputs.release_allowed == 'true'
+    if: needs.version.outputs.release_allowed == 'true'
     runs-on: windows-latest
     env:
       PVCVPN_VERSION: ${{ needs.version.outputs.version }}
@@ -112,8 +113,8 @@ jobs:
 
   build-linux:
     needs: version
-    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.version.outputs.release_allowed == 'true'
-    runs-on: ubuntu-20.04
+    if: needs.version.outputs.release_allowed == 'true'
+    runs-on: ubuntu-latest
     env:
       PVCVPN_VERSION: ${{ needs.version.outputs.version }}
     steps:
@@ -136,12 +137,12 @@ jobs:
         run: |
           ctk_path=$(python -c "import customtkinter, pathlib; print(pathlib.Path(customtkinter.__path__[0]))")
           python -m PyInstaller --noconfirm --onefile --windowed \
-            --name "PrivateCrossVPN-${PVCVPN_VERSION}-ubuntu20.04" \
+            --name "PrivateCrossVPN-${PVCVPN_VERSION}-linux" \
             --add-data "${ctk_path}:customtkinter" \
             --add-data "img:img" \
             privatecrossvpn.py
           mkdir -p release-assets
-          cp "dist/PrivateCrossVPN-${PVCVPN_VERSION}-ubuntu20.04" release-assets/PrivateCrossVPN-linux
+          cp "dist/PrivateCrossVPN-${PVCVPN_VERSION}-linux" release-assets/PrivateCrossVPN-linux
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
@@ -150,12 +151,9 @@ jobs:
           path: release-assets/PrivateCrossVPN-linux
 
   publish-release:
-    needs:
-      - version
-      - build-windows
-      - build-linux
-    if: (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') && needs.version.outputs.release_allowed == 'true'
-    runs-on: ubuntu-20.04
+    needs: [version, build-windows, build-linux]
+    if: needs.version.outputs.release_allowed == 'true'
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
