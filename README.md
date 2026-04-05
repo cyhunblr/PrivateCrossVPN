@@ -9,9 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-python.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-python.yml/badge.svg" alt="CI Python"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-markdown.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-markdown.yml/badge.svg" alt="CI Markdown"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-mobile.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-mobile.yml/badge.svg" alt="CI Mobile"></a>
   <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/release.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/release.yml/badge.svg" alt="Release"></a>
-  <a href="https://github.com/cyhunblr/PrivateCrossVPN/releases"><img src="https://img.shields.io/badge/release-v1.2.1-blue" alt="Latest Release"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/releases"><img src="https://img.shields.io/badge/release-v1.2.2-blue" alt="Latest Release"></a>
   <a href="https://github.com/cyhunblr/PrivateCrossVPN/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
 </p>
 
@@ -117,6 +119,7 @@ This repo uses [Conventional Commits v1.0.0](https://www.conventionalcommits.org
 **Types:** `feat`, `fix`, `refactor`, `chore`, `docs`, `build`, `ci`, `perf`, `style`, `revert`, `test`
 
 **Examples:**
+
 ```
 feat: add GitHub Actions release workflow
 fix(vpn): handle missing SSH key path
@@ -131,11 +134,13 @@ When VS Code or Copilot suggests a commit message, keep it in this format.
 **Local commit validation with commitlint:**
 
 1. Install Node.js dependencies:
+
    ```bash
    npm install
    ```
 
 2. Enable git hooks:
+
    ```bash
    npm run prepare
    git config core.hooksPath .githooks
@@ -144,6 +149,7 @@ When VS Code or Copilot suggests a commit message, keep it in this format.
 3. Commit messages are validated locally and in CI using [commitlint](https://commitlint.js.org/) and [husky](https://typicode.github.io/husky/).
 
 **Breaking Changes:** Use `!` before the colon or add `BREAKING CHANGE:` footer:
+
 ```
 feat!: remove support for older API
 feat: refactor API
