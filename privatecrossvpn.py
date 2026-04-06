@@ -38,7 +38,7 @@ from urllib.request import Request, urlopen
 # ---------------------------------------------------------------------------
 try:
     import customtkinter as ctk  # type: ignore[import-untyped]
-    from tkinter import filedialog, messagebox
+    from tkinter import TclError, filedialog, messagebox
 except ImportError:
     sys.exit(
         "[FATAL] customtkinter is required.\n"
@@ -57,10 +57,68 @@ IP_API_TIMEOUT = 8  # seconds
 RECONNECT_DELAY_BASE = 3  # seconds (exponential back-off base)
 RECONNECT_MAX_RETRIES = 5
 HEARTBEAT_INTERVAL = 15  # seconds between connection health checks
-APP_DIR = Path.home() / ".privatecrossvpn"
+
+
+def _resolve_app_dir() -> Path:
+    """Resolve the app data directory, preferring the invoking user home under sudo."""
+    user_home = Path.home()
+
+    if os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() == 0:
+        sudo_user = os.environ.get("SUDO_USER")
+        pkexec_uid = os.environ.get("PKEXEC_UID")
+
+        try:
+            import pwd  # type: ignore[import-not-found]
+
+            if sudo_user:
+                user_home = Path(pwd.getpwnam(sudo_user).pw_dir)
+            elif pkexec_uid and pkexec_uid.isdigit():
+                user_home = Path(pwd.getpwuid(int(pkexec_uid)).pw_dir)
+        except Exception:
+            pass
+
+    return user_home / ".privatecrossvpn"
+
+
+def _resolve_app_file_owner() -> tuple[Optional[int], Optional[int]]:
+    """Resolve target uid/gid for files created during elevated runs."""
+    if os.name != "posix" or not hasattr(os, "geteuid") or os.geteuid() != 0:
+        return None, None
+
+    sudo_user = os.environ.get("SUDO_USER")
+    pkexec_uid = os.environ.get("PKEXEC_UID")
+    try:
+        import pwd  # type: ignore[import-not-found]
+
+        if sudo_user:
+            pw = pwd.getpwnam(sudo_user)
+            return pw.pw_uid, pw.pw_gid
+        if pkexec_uid and pkexec_uid.isdigit():
+            pw = pwd.getpwuid(int(pkexec_uid))
+            return pw.pw_uid, pw.pw_gid
+    except Exception:
+        pass
+
+    return None, None
+
+
+def _set_app_file_owner(path: Path) -> None:
+    """Best-effort chown to invoking user for files/directories created as root."""
+    uid, gid = _resolve_app_file_owner()
+    if uid is None or gid is None:
+        return
+    try:
+        os.chown(path, uid, gid)
+    except Exception:
+        pass
+
+
+APP_DIR = _resolve_app_dir()
 APP_DIR.mkdir(parents=True, exist_ok=True)
 DEFAULT_CONFIGS_DIR = APP_DIR / "configs"
 DEFAULT_CONFIGS_DIR.mkdir(parents=True, exist_ok=True)
+_set_app_file_owner(APP_DIR)
+_set_app_file_owner(DEFAULT_CONFIGS_DIR)
 SETTINGS_FILE = APP_DIR / "settings.json"
 
 
@@ -282,6 +340,7 @@ class AppSettings:
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, indent=2)
+            _set_app_file_owner(SETTINGS_FILE)
         except Exception as exc:
             logger.error("Failed to save settings: %s", exc)
 
@@ -289,6 +348,7 @@ class AppSettings:
     def configs_dir(self) -> Path:
         p = Path(self._data["configs_dir"])
         p.mkdir(parents=True, exist_ok=True)
+        _set_app_file_owner(p)
         return p
 
     @configs_dir.setter
@@ -343,6 +403,7 @@ class ProfileManager:
         path = self._dir / f"{safe_name}.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+        _set_app_file_owner(path)
         logger.info("Profile saved: %s", path)
         return path
 
@@ -371,9 +432,19 @@ class ProfileManager:
         proto = Protocol(data.get("protocol", "WireGuard"))
         profile = ConnectionProfile(protocol=proto)
 
-        # For WireGuard/OpenVPN the actual config file is generated/saved alongside
+        # Backward compatibility for old profiles that include config_file.
         config_file = data.get("config_file")
-        if config_file:
+        if proto == Protocol.WIREGUARD:
+            # Always derive runtime config from JSON profile fields.
+            profile.config_path = self.generate_wireguard_conf(
+                data.get("name", "wireguard"), data
+            )
+        elif proto == Protocol.OPENVPN:
+            # Always derive runtime config from JSON profile fields.
+            profile.config_path = self.generate_openvpn_conf(
+                data.get("name", "openvpn"), data
+            )
+        elif config_file:
             profile.config_path = Path(config_file)
 
         profile.ssh_host = data.get("ssh_host", "")
@@ -414,6 +485,7 @@ class ProfileManager:
             lines.append(f"PersistentKeepalive = {data['wg_keepalive']}")
         lines.append("")
         conf_path.write_text("\n".join(lines), encoding="utf-8")
+        _set_app_file_owner(conf_path)
         try:
             conf_path.chmod(0o600)
         except Exception:
@@ -460,6 +532,7 @@ class ProfileManager:
             lines.append(data["ovpn_extra"].strip())
         lines.append("")
         conf_path.write_text("\n".join(lines), encoding="utf-8")
+        _set_app_file_owner(conf_path)
         logger.info("OpenVPN config generated: %s", conf_path)
         return conf_path
 
@@ -1575,6 +1648,7 @@ class PrivateCrossVPNApp(ctk.CTk):
         self._set_app_icon()
 
         self._build_ui()
+        self._install_text_edit_shortcuts()
         self._check_privileges()
         self._poll_log_queue()
         self._refresh_ip_info()
@@ -3384,9 +3458,6 @@ class PrivateCrossVPNApp(ctk.CTk):
         for key, entry in self._wg_entries.items():
             if key != "wg_name":
                 data[key] = entry.get().strip()
-        # Generate the actual .conf file
-        conf_path = self.profile_mgr.generate_wireguard_conf(name, data)
-        data["config_file"] = str(conf_path)
         self.profile_mgr.save_profile(name, data)
         self.settings.last_profile = name
         self._load_profile_list()
@@ -3404,8 +3475,6 @@ class PrivateCrossVPNApp(ctk.CTk):
                 data[key] = entry.get().strip()
         data["ovpn_ca"] = self._ovpn_ca_text.get("1.0", "end").strip()
         data["ovpn_extra"] = self._ovpn_extra_text.get("1.0", "end").strip()
-        conf_path = self.profile_mgr.generate_openvpn_conf(name, data)
-        data["config_file"] = str(conf_path)
         self.profile_mgr.save_profile(name, data)
         self.settings.last_profile = name
         self._load_profile_list()
@@ -3468,36 +3537,35 @@ class PrivateCrossVPNApp(ctk.CTk):
             return
 
         src = Path(path)
-        # Copy to configs dir
-        dest = self.settings.configs_dir / src.name
-        shutil.copy2(src, dest)
-        logger.info("Imported config: %s -> %s", src, dest)
-
         # Auto-create a profile for it
         name = src.stem
         if proto == Protocol.WIREGUARD:
             data: dict[str, Any] = {
                 "protocol": proto.value,
                 "name": name,
-                "config_file": str(dest),
             }
             # Parse .conf file and merge parsed fields
-            parsed = self.profile_mgr.parse_wireguard_conf(dest)
+            parsed = self.profile_mgr.parse_wireguard_conf(src)
             data.update(parsed)
         elif proto == Protocol.OPENVPN:
             data = {
                 "protocol": proto.value,
                 "name": name,
-                "config_file": str(dest),
             }
             # Parse .ovpn file and merge parsed fields
-            parsed = self.profile_mgr.parse_openvpn_conf(dest)
+            parsed = self.profile_mgr.parse_openvpn_conf(src)
             data.update(parsed)
         else:
             # SSH — import key
+            dest = self.settings.configs_dir / src.name
+            shutil.copy2(src, dest)
+            _set_app_file_owner(dest)
             self._ssh_key_path = dest
             self._ssh_key_label.configure(text=dest.name)
+            logger.info("SSH key imported: %s -> %s", src, dest)
             return
+
+        logger.info("Imported config fields from: %s", src)
 
         self.profile_mgr.save_profile(name, data)
         self.settings.last_profile = name
@@ -3527,7 +3595,7 @@ class PrivateCrossVPNApp(ctk.CTk):
             logger.info("Configs directory changed to: %s", d)
 
     def _export_profile(self) -> None:
-        """Export current profile to .conf, .ovpn, or .json format."""
+        """Export current profile as JSON into the configured configs directory."""
         name = self._profile_var.get()
         if name == "(new profile)":
             messagebox.showerror("Error", "Select or create a profile first.")
@@ -3538,96 +3606,95 @@ class PrivateCrossVPNApp(ctk.CTk):
             messagebox.showerror("Error", "Could not load profile.")
             return
 
-        proto = data.get("protocol", "WireGuard")
-
-        # Ask user which format to export
-        export_format = self._ask_export_format(proto)
-        if not export_format:
-            return
-
-        # Determine file extension and generate content
-        if export_format == "conf" and proto == Protocol.WIREGUARD.value:
-            filetypes = [("WireGuard Config", "*.conf"), ("All Files", "*.*")]
-            default_ext = ".conf"
-        elif export_format == "ovpn" and proto == Protocol.OPENVPN.value:
-            filetypes = [("OpenVPN Config", "*.ovpn"), ("All Files", "*.*")]
-            default_ext = ".ovpn"
-        else:
-            # JSON format works for all
-            filetypes = [("JSON Profile", "*.json"), ("All Files", "*.*")]
-            default_ext = ".json"
-
-        # Open save dialog
-        initial_file = f"{name}{default_ext}"
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=default_ext,
-            initialfile=initial_file,
-            filetypes=filetypes,
-        )
-
-        if not file_path:
-            return
-
         try:
-            if export_format == "conf" and proto == Protocol.WIREGUARD.value:
-                # Generate .conf from profile fields
-                dest_path = self.profile_mgr.generate_wireguard_conf(name, data)
-                shutil.copy2(dest_path, file_path)
-                messagebox.showinfo("Success", f"Profile exported to:\n{file_path}")
-            elif export_format == "ovpn" and proto == Protocol.OPENVPN.value:
-                # Generate .ovpn from profile fields
-                dest_path = self.profile_mgr.generate_openvpn_conf(name, data)
-                shutil.copy2(dest_path, file_path)
-                messagebox.showinfo("Success", f"Profile exported to:\n{file_path}")
-            else:
-                # Export as JSON
-                with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2)
-                messagebox.showinfo("Success", f"Profile exported to:\n{file_path}")
-
-            logger.info("Profile '%s' exported to %s", name, file_path)
+            self.settings.configs_dir.mkdir(parents=True, exist_ok=True)
+            safe_name = re.sub(r"[^\w\-. ]", "_", name)
+            export_path = self.settings.configs_dir / f"{safe_name}.export.json"
+            with open(export_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            _set_app_file_owner(export_path)
+            messagebox.showinfo("Success", f"Profile exported to:\n{export_path}")
+            logger.info("Profile '%s' exported to %s", name, export_path)
         except Exception as exc:
             logger.error("Export failed: %s", exc)
             messagebox.showerror("Export Error", f"Failed to export profile:\n{exc}")
 
-    def _ask_export_format(self, proto: str) -> Optional[str]:
-        """Ask user which format to export the profile."""
-        if proto == Protocol.WIREGUARD.value:
-            formats = ["WireGuard .conf", "JSON backup", "Cancel"]
-            buttons = {"WireGuard .conf": "conf", "JSON backup": "json"}
-        elif proto == Protocol.OPENVPN.value:
-            formats = ["OpenVPN .ovpn", "JSON backup", "Cancel"]
-            buttons = {"OpenVPN .ovpn": "ovpn", "JSON backup": "json"}
-        else:
-            # SSH only supports JSON
-            return "json"
+    def _install_text_edit_shortcuts(self) -> None:
+        """Enable consistent Ctrl+A and selection-delete behavior on editable fields."""
 
-        # Create a simple dialog for format selection
-        window = ctk.CTkToplevel(self)
-        window.title("Export Format")
-        window.geometry("300x150")
-        window.resizable(False, False)
+        def _walk(widget: Any) -> None:
+            for child in widget.winfo_children():
+                if isinstance(child, ctk.CTkEntry):
+                    self._bind_entry_shortcuts(child)
+                elif isinstance(child, ctk.CTkTextbox):
+                    self._bind_textbox_shortcuts(child)
+                _walk(child)
 
-        label = ctk.CTkLabel(window, text="Choose export format:")
-        label.pack(pady=10)
+        _walk(self)
 
-        result: dict[str, Optional[str]] = {"format": None}
+    def _bind_entry_shortcuts(self, entry: ctk.CTkEntry) -> None:
+        targets = [entry]
+        inner = getattr(entry, "_entry", None)
+        if inner is not None:
+            targets.append(inner)
 
-        def select_format(fmt: str) -> None:
-            result["format"] = buttons.get(fmt)
-            window.destroy()
+        for target in targets:
+            target.bind("<Control-a>", self._select_all_entry_event, add="+")
+            target.bind("<Control-A>", self._select_all_entry_event, add="+")
+            target.bind("<Delete>", self._delete_selected_entry_event, add="+")
+            target.bind("<BackSpace>", self._delete_selected_entry_event, add="+")
 
-        for fmt in formats:
-            btn = ctk.CTkButton(
-                window, text=fmt, command=lambda f=fmt: select_format(f)
-            )
-            btn.pack(pady=5, padx=20, fill="x")
+    def _bind_textbox_shortcuts(self, textbox: ctk.CTkTextbox) -> None:
+        targets = [textbox]
+        inner = getattr(textbox, "_textbox", None)
+        if inner is not None:
+            targets.append(inner)
 
-        window.transient(self)
-        window.grab_set()
-        self.wait_window(window)
+        for target in targets:
+            target.bind("<Control-a>", self._select_all_text_event, add="+")
+            target.bind("<Control-A>", self._select_all_text_event, add="+")
+            target.bind("<Delete>", self._delete_selected_text_event, add="+")
+            target.bind("<BackSpace>", self._delete_selected_text_event, add="+")
 
-        return result["format"]
+    def _select_all_entry_event(self, event: Any) -> str:
+        widget = event.widget
+        try:
+            widget.select_range(0, "end")
+            widget.icursor("end")
+            return "break"
+        except Exception:
+            return "break"
+
+    def _delete_selected_entry_event(self, event: Any) -> Optional[str]:
+        widget = event.widget
+        try:
+            if widget.selection_present():
+                widget.delete("sel.first", "sel.last")
+                return "break"
+        except Exception:
+            pass
+        return None
+
+    def _select_all_text_event(self, event: Any) -> str:
+        widget = event.widget
+        try:
+            widget.tag_add("sel", "1.0", "end-1c")
+            widget.mark_set("insert", "end-1c")
+            return "break"
+        except Exception:
+            return "break"
+
+    def _delete_selected_text_event(self, event: Any) -> Optional[str]:
+        widget = event.widget
+        try:
+            if widget.tag_ranges("sel"):
+                widget.delete("sel.first", "sel.last")
+                return "break"
+        except TclError:
+            return None
+        except Exception:
+            return None
+        return None
 
     # -----------------------------------------------------------------------
     # Connect / Disconnect
