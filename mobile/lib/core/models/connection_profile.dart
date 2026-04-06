@@ -22,6 +22,7 @@ sealed class ConnectionProfile {
   String get name;
   Protocol get protocol;
   Map<String, dynamic> toJson();
+  String? validate();
 
   static ConnectionProfile fromJson(Map<String, dynamic> j) {
     final proto = Protocol.fromString(j['protocol'] as String);
@@ -92,6 +93,38 @@ final class WireGuardProfile extends ConnectionProfile {
         'wg_keepalive': keepalive,
         if (configFile != null) 'config_file': configFile,
       };
+
+  @override
+  String? validate() {
+    if (name.trim().isEmpty) {
+      return 'Profile name is required';
+    }
+    if (privateKey.trim().isEmpty) {
+      return 'WireGuard private key is required';
+    }
+    if (address.trim().isEmpty) {
+      return 'WireGuard address is required';
+    }
+    if (publicKey.trim().isEmpty) {
+      return 'WireGuard server public key is required';
+    }
+    if (endpoint.trim().isEmpty) {
+      return 'WireGuard endpoint is required';
+    }
+
+    final endpointMatch = RegExp(r'^(?:\[[^\]]+\]|[^:]+):([0-9]{1,5})$')
+        .firstMatch(endpoint.trim());
+    if (endpointMatch == null) {
+      return 'WireGuard endpoint must be host:port';
+    }
+
+    final port = int.tryParse(endpointMatch.group(1)!);
+    if (port == null || port < 1 || port > 65535) {
+      return 'WireGuard endpoint port must be between 1 and 65535';
+    }
+
+    return null;
+  }
 
   /// Generates .conf file content compatible with wg-quick
   String toWireGuardConf() {
@@ -197,6 +230,24 @@ final class OpenVPNProfile extends ConnectionProfile {
         if (configFile != null) 'config_file': configFile,
       };
 
+  @override
+  String? validate() {
+    if (name.trim().isEmpty) {
+      return 'Profile name is required';
+    }
+    if (remote.trim().isEmpty) {
+      return 'OpenVPN remote host is required';
+    }
+    final portValue = int.tryParse(port);
+    if (portValue == null || portValue < 1 || portValue > 65535) {
+      return 'OpenVPN port must be between 1 and 65535';
+    }
+    if (proto.trim().isEmpty) {
+      return 'OpenVPN protocol is required';
+    }
+    return null;
+  }
+
   OpenVPNProfile copyWith({
     String? name,
     String? remote,
@@ -266,6 +317,25 @@ final class SSHProfile extends ConnectionProfile {
         'socks_port': socksPort,
         if (keyPath != null) 'ssh_key_path': keyPath,
       };
+
+  @override
+  String? validate() {
+    if (name.trim().isEmpty) {
+      return 'Profile name is required';
+    }
+    if (host.trim().isEmpty) {
+      return 'SSH host is required';
+    }
+    final sshPort = int.tryParse(port);
+    if (sshPort == null || sshPort < 1 || sshPort > 65535) {
+      return 'SSH port must be between 1 and 65535';
+    }
+    final socks = int.tryParse(socksPort);
+    if (socks == null || socks < 1 || socks > 65535) {
+      return 'SOCKS5 port must be between 1 and 65535';
+    }
+    return null;
+  }
 
   SSHProfile copyWith({
     String? name,

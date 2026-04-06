@@ -79,8 +79,14 @@ class ProfileManager {
     if (!file.existsSync()) return null;
 
     final content = file.readAsStringSync(encoding: utf8);
+    return importFromContent(file.uri.pathSegments.last, content);
+  }
 
-    if (filePath.endsWith('.json')) {
+  Future<ConnectionProfile?> importFromContent(
+      String fileName, String content) async {
+    final lowerName = fileName.toLowerCase();
+
+    if (lowerName.endsWith('.json')) {
       try {
         final json = jsonDecode(content) as Map<String, dynamic>;
         final profile = ConnectionProfile.fromJson(json);
@@ -91,8 +97,9 @@ class ProfileManager {
       }
     }
 
-    if (filePath.endsWith('.conf')) {
-      final profileName = file.uri.pathSegments.last.replaceAll('.conf', '');
+    if (lowerName.endsWith('.conf')) {
+      final profileName =
+          fileName.replaceAll(RegExp(r'\.(conf)$', caseSensitive: false), '');
       return _importWireGuardConf(content, profileName);
     }
 
@@ -139,9 +146,13 @@ class ProfileManager {
     }
 
     if (privateKey == null ||
+        privateKey.isEmpty ||
         address == null ||
+        address.isEmpty ||
         publicKey == null ||
-        endpoint == null) {
+        publicKey.isEmpty ||
+        endpoint == null ||
+        endpoint.isEmpty) {
       return null;
     }
 

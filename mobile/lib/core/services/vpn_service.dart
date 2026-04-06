@@ -36,6 +36,14 @@ class VpnService {
     if (_state == TunnelState.connected || _state == TunnelState.connecting) {
       return;
     }
+
+    final validationError = profile.validate();
+    if (validationError != null) {
+      _setState(TunnelState.error);
+      _activeProfile = null;
+      throw FormatException(validationError);
+    }
+
     _setState(TunnelState.connecting);
     _activeProfile = profile;
     try {
@@ -49,10 +57,19 @@ class VpnService {
       }
       _setState(TunnelState.connected);
       _connectedAt = DateTime.now();
-    } on PlatformException {
+    } on PlatformException catch (error) {
       _setState(TunnelState.error);
       _activeProfile = null;
-      rethrow;
+      final message = error.message?.trim();
+      final details = error.details?.toString().trim();
+      if (message != null && message.isNotEmpty) {
+        throw Exception(message);
+      }
+      if (details != null && details.isNotEmpty) {
+        throw Exception(details);
+      }
+      throw Exception(
+          'VPN plugin failed to start. Check the profile values and permissions.');
     } catch (_) {
       _setState(TunnelState.error);
       _activeProfile = null;
@@ -88,8 +105,9 @@ class VpnService {
 
   Future<void> _connectWireGuard(WireGuardProfile profile) async {
     await _wg.initialize(interfaceName: 'wg0');
+    final serverAddress = _serverAddressFromEndpoint(profile.endpoint);
     await _wg.startVpn(
-      serverAddress: profile.endpoint.split(':').first,
+      serverAddress: serverAddress,
       wgQuickConfig: profile.toWireGuardConf(),
       providerBundleIdentifier: 'com.privatecrossvpn.app.tunnel',
     );
@@ -209,6 +227,23 @@ class VpnService {
   void _setState(TunnelState s) {
     _state = s;
     _stateController.add(s);
+  }
+
+  String _serverAddressFromEndpoint(String endpoint) {
+    final trimmed = endpoint.trim();
+    if (trimmed.startsWith('[')) {
+      final endBracket = trimmed.indexOf(']');
+      if (endBracket > 1) {
+        return trimmed.substring(1, endBracket);
+      }
+    }
+
+    final lastColon = trimmed.lastIndexOf(':');
+    if (lastColon > 0) {
+      return trimmed.substring(0, lastColon);
+    }
+
+    return trimmed;
   }
 
   void dispose() {
