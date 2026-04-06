@@ -38,6 +38,9 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final ReconnectManager _reconnect;
   static const _locationRefreshAttempts = 8;
+  String? _preConnectIp;
+  bool _locationSyncInProgress = false;
+  bool _locationSynced = true;
 
   @override
   void initState() {
@@ -57,6 +60,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _reconnect.stop();
       await vpn.disconnect();
       IpInfoService.instance.clearCache();
+      if (mounted) {
+        setState(() {
+          _preConnectIp = null;
+          _locationSyncInProgress = false;
+          _locationSynced = true;
+        });
+      }
       ref.invalidate(ipInfoProvider);
       return;
     }
@@ -76,6 +86,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     try {
       final oldIp = (await IpInfoService.instance.fetch())?.ip;
+      if (mounted) {
+        setState(() {
+          _preConnectIp = oldIp;
+          _locationSyncInProgress = true;
+          _locationSynced = false;
+        });
+      }
       await vpn.connect(profile);
       _reconnect.start();
       await _refreshConnectedLocation(oldIp);
@@ -98,13 +115,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         continue;
       }
       if (previousIp == null || refreshed.ip != previousIp) {
+        if (mounted) {
+          setState(() {
+            _locationSynced = true;
+            _locationSyncInProgress = false;
+          });
+        }
         ref.invalidate(ipInfoProvider);
         return;
       }
     }
 
+    if (mounted) {
+      setState(() {
+        _locationSyncInProgress = false;
+      });
+    }
     // Even if IP did not change, refresh UI with the latest available info.
     ref.invalidate(ipInfoProvider);
+  }
+
+  Widget _buildLocationSyncStatus() {
+    return Row(
+      children: const [
+        SizedBox(
+          height: 14,
+          width: 14,
+          child: CircularProgressIndicator(
+            color: Colors.white,
+            strokeWidth: 2,
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Updating tunnel location...',
+            style: TextStyle(color: Colors.white70),
+          ),
+        ),
+      ],
+    );
   }
 
   String? _activeRemoteServer() {
@@ -217,31 +267,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         const SizedBox(height: 4),
                       ipInfo.when(
                         data: (info) => info != null
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'IP: ${info.ip}',
-                                    style:
-                                        const TextStyle(color: Colors.white70),
-                                  ),
-                                  Text(
-                                    'Location: ${info.location}',
-                                    style:
-                                        const TextStyle(color: Colors.white70),
-                                  ),
-                                  Text(
-                                    'ISP: ${info.org}',
-                                    style:
-                                        const TextStyle(color: Colors.white70),
-                                  ),
-                                ],
-                              )
-                            : const SizedBox(),
-                        loading: () => const CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
+                            ? ((_locationSynced ||
+                                    _preConnectIp == null ||
+                                    info.ip != _preConnectIp)
+                                ? Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'IP: ${info.ip}',
+                                        style: const TextStyle(
+                                            color: Colors.white70),
+                                      ),
+                                      Text(
+                                        'Location: ${info.location}',
+                                        style: const TextStyle(
+                                            color: Colors.white70),
+                                      ),
+                                      Text(
+                                        'ISP: ${info.org}',
+                                        style: const TextStyle(
+                                            color: Colors.white70),
+                                      ),
+                                    ],
+                                  )
+                                : _buildLocationSyncStatus())
+                            : (_locationSyncInProgress
+                                ? _buildLocationSyncStatus()
+                                : const SizedBox()),
+                        loading: () => _buildLocationSyncStatus(),
                         error: (_, __) => const SizedBox(),
                       ),
                       _UptimeWidget(
