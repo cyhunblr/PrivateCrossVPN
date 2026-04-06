@@ -25,8 +25,8 @@
       "npx -y markdownlint-cli --fix"
     ],
     "mobile/lib/**/*.dart": [
-      "dart format",
-      "dart analyze"
+      "bash -lc 'cd mobile && dart format lib'",
+      "bash -lc 'cd mobile && flutter pub get >/dev/null && dart analyze lib'"
     ]
   }
 }

@@ -99,8 +99,16 @@ class ProfileManager {
     return null;
   }
 
-  Future<ConnectionProfile?> _importWireGuardConf(String conf, String name) async {
-    String? privateKey, address, dns, publicKey, presharedKey, endpoint, allowedIps, keepalive;
+  Future<ConnectionProfile?> _importWireGuardConf(
+      String conf, String name) async {
+    String? privateKey,
+        address,
+        dns,
+        publicKey,
+        presharedKey,
+        endpoint,
+        allowedIps,
+        keepalive;
 
     for (final line in conf.split('\n')) {
       final trimmed = line.trim();
@@ -111,10 +119,14 @@ class ProfileManager {
       if (trimmed.startsWith('PresharedKey')) presharedKey = _iniValue(trimmed);
       if (trimmed.startsWith('Endpoint')) endpoint = _iniValue(trimmed);
       if (trimmed.startsWith('AllowedIPs')) allowedIps = _iniValue(trimmed);
-      if (trimmed.startsWith('PersistentKeepalive')) keepalive = _iniValue(trimmed);
+      if (trimmed.startsWith('PersistentKeepalive'))
+        keepalive = _iniValue(trimmed);
     }
 
-    if (privateKey == null || address == null || publicKey == null || endpoint == null) {
+    if (privateKey == null ||
+        address == null ||
+        publicKey == null ||
+        endpoint == null) {
       return null;
     }
 
@@ -135,7 +147,9 @@ class ProfileManager {
 
   String _iniValue(String line) {
     final idx = line.indexOf('=');
-    if (idx < 0) return '';
+    if (idx < 0) {
+      return '';
+    }
     return line.substring(idx + 1).trim();
   }
 
