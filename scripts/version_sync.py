@@ -76,6 +76,11 @@ def compute_next_version(
         base = base_version
         log_range = "HEAD"
 
+    commit_count = int(run_git(["rev-list", "--count", log_range], repo_root) or "0")
+    if latest_tag and commit_count == 0 and not pending_message:
+        # When HEAD is exactly at the latest release tag, keep that version.
+        return base
+
     subjects = run_git(["log", "--format=%s", log_range], repo_root)
     bodies = run_git(["log", "--format=%B", log_range], repo_root)
 
