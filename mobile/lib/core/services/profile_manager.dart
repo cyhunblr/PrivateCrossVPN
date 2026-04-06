@@ -112,15 +112,30 @@ class ProfileManager {
 
     for (final line in conf.split('\n')) {
       final trimmed = line.trim();
-      if (trimmed.startsWith('PrivateKey')) privateKey = _iniValue(trimmed);
-      if (trimmed.startsWith('Address')) address = _iniValue(trimmed);
-      if (trimmed.startsWith('DNS')) dns = _iniValue(trimmed);
-      if (trimmed.startsWith('PublicKey')) publicKey = _iniValue(trimmed);
-      if (trimmed.startsWith('PresharedKey')) presharedKey = _iniValue(trimmed);
-      if (trimmed.startsWith('Endpoint')) endpoint = _iniValue(trimmed);
-      if (trimmed.startsWith('AllowedIPs')) allowedIps = _iniValue(trimmed);
-      if (trimmed.startsWith('PersistentKeepalive'))
+      if (trimmed.startsWith('PrivateKey')) {
+        privateKey = _iniValue(trimmed);
+      }
+      if (trimmed.startsWith('Address')) {
+        address = _iniValue(trimmed);
+      }
+      if (trimmed.startsWith('DNS')) {
+        dns = _iniValue(trimmed);
+      }
+      if (trimmed.startsWith('PublicKey')) {
+        publicKey = _iniValue(trimmed);
+      }
+      if (trimmed.startsWith('PresharedKey')) {
+        presharedKey = _iniValue(trimmed);
+      }
+      if (trimmed.startsWith('Endpoint')) {
+        endpoint = _iniValue(trimmed);
+      }
+      if (trimmed.startsWith('AllowedIPs')) {
+        allowedIps = _iniValue(trimmed);
+      }
+      if (trimmed.startsWith('PersistentKeepalive')) {
         keepalive = _iniValue(trimmed);
+      }
     }
 
     if (privateKey == null ||
