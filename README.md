@@ -13,7 +13,7 @@
   <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-markdown.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-markdown.yml/badge.svg" alt="CI Markdown"></a>
   <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-mobile.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/ci-mobile.yml/badge.svg" alt="CI Mobile"></a>
   <a href="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/release.yml"><img src="https://github.com/cyhunblr/PrivateCrossVPN/actions/workflows/release.yml/badge.svg" alt="Release"></a>
-  <a href="https://github.com/cyhunblr/PrivateCrossVPN/releases"><img src="https://img.shields.io/badge/release-v1.7.1-blue" alt="Latest Release"></a>
+  <a href="https://github.com/cyhunblr/PrivateCrossVPN/releases"><img src="https://img.shields.io/badge/release-v1.7.2-blue" alt="Latest Release"></a>
   <a href="https://github.com/cyhunblr/PrivateCrossVPN/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
 </p>
 
@@ -53,7 +53,7 @@ Releases are produced automatically from `main` and published with prebuilt arti
 
 ```
 +---------------------------+-------------------------------------------+
-|  PrivateCrossVPN v1.7.1   |  Status & Location                        |
+|  PrivateCrossVPN v1.7.2   |  Status & Location                        |
 |                           |  * Connected           Uptime: 00:14:32   |
 |  Saved Profiles           |  IP: 185.xxx.xxx.xx    Kill-Switch: ON    |
 |  [my-wireguard      ][X]  |  Location: Frankfurt, Hesse, DE           |
