@@ -115,7 +115,9 @@ def test_build_ssh_login_command_quotes_key_path(monkeypatch, tmp_path):
 def test_sanitize_wg_interface_name_enforces_linux_rules(monkeypatch, tmp_path):
     module = load_module(monkeypatch, tmp_path)
 
-    assert module.sanitize_wg_interface_name("digitalocean-wireguard") == "digitalocean_wi"
+    assert (
+        module.sanitize_wg_interface_name("digitalocean-wireguard") == "digitalocean_wi"
+    )
     assert module.sanitize_wg_interface_name("demo/team-vpn") == "demo_team_vpn"
 
 
@@ -210,15 +212,114 @@ def test_build_local_dependency_install_commands_for_windows(monkeypatch, tmp_pa
 
     assert commands == [
         [
-            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
             "Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0",
         ],
         [
-            "winget", "install", "-e", "--id", "WireGuard.WireGuard",
-            "--accept-package-agreements", "--accept-source-agreements",
+            "winget",
+            "install",
+            "-e",
+            "--id",
+            "WireGuard.WireGuard",
+            "--accept-package-agreements",
+            "--accept-source-agreements",
         ],
         [
-            "winget", "install", "-e", "--id", "OpenVPNTechnologies.OpenVPN",
-            "--accept-package-agreements", "--accept-source-agreements",
+            "winget",
+            "install",
+            "-e",
+            "--id",
+            "OpenVPNTechnologies.OpenVPN",
+            "--accept-package-agreements",
+            "--accept-source-agreements",
         ],
     ]
+
+
+def test_parse_wireguard_conf_extracts_all_fields(monkeypatch, tmp_path):
+    """Test that WireGuard .conf parser correctly extracts all configuration fields."""
+    module = load_module(monkeypatch, tmp_path)
+
+    settings = module.AppSettings()
+    settings.configs_dir = tmp_path / "configs"
+    manager = module.ProfileManager(settings)
+
+    # Create a .conf file with all fields
+    conf_content = """[Interface]
+PrivateKey = WPJ0ecqJObjEcZhZqN9CTBP4Z0hT1I3t8W5qBJFfVWY=
+Address = 10.0.0.2/24
+DNS = 1.1.1.1, 8.8.8.8
+ListenPort = 51820
+
+[Peer]
+PublicKey = HIgo9xNzJMWLKASShiTqIybxZ0U3wGLiUeJ1PKf8ykw=
+PresharedKey = EnlxN+OYoU4/9A3kNKxY5r/EsKQ4SbL0V1xLwybODkQ=
+Endpoint = vpn.example.com:51820
+AllowedIPs = 0.0.0.0/0, ::/0
+PersistentKeepalive = 25
+"""
+    conf_path = tmp_path / "configs" / "test.conf"
+    conf_path.parent.mkdir(parents=True, exist_ok=True)
+    conf_path.write_text(conf_content, encoding="utf-8")
+
+    parsed = manager.parse_wireguard_conf(conf_path)
+
+    assert parsed["wg_private_key"] == "WPJ0ecqJObjEcZhZqN9CTBP4Z0hT1I3t8W5qBJFfVWY="
+    assert parsed["wg_address"] == "10.0.0.2/24"
+    assert parsed["wg_dns"] == "1.1.1.1, 8.8.8.8"
+    assert parsed["wg_listen_port"] == "51820"
+    assert parsed["wg_public_key"] == "HIgo9xNzJMWLKASShiTqIybxZ0U3wGLiUeJ1PKf8ykw="
+    assert parsed["wg_preshared_key"] == "EnlxN+OYoU4/9A3kNKxY5r/EsKQ4SbL0V1xLwybODkQ="
+    assert parsed["wg_endpoint"] == "vpn.example.com:51820"
+    assert parsed["wg_allowed_ips"] == "0.0.0.0/0, ::/0"
+    assert parsed["wg_keepalive"] == "25"
+
+
+def test_parse_openvpn_conf_extracts_all_fields(monkeypatch, tmp_path):
+    """Test that OpenVPN .ovpn parser correctly extracts all configuration fields."""
+    module = load_module(monkeypatch, tmp_path)
+
+    settings = module.AppSettings()
+    settings.configs_dir = tmp_path / "configs"
+    manager = module.ProfileManager(settings)
+
+    # Create an .ovpn file with all common fields
+    ovpn_content = """client
+dev tun
+proto udp
+remote vpn.example.com 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+cipher AES-256-GCM
+auth SHA256
+verb 3
+
+<ca>
+-----BEGIN CERTIFICATE-----
+MIIDXTCCAkWgAwIBAgIJAJNbv6+DLg7oMA0GCSqGSIb3DQEBAQUAFDB7MQswCQYD
+-----END CERTIFICATE-----
+</ca>
+
+remote-cert-tls server
+script-security 2
+"""
+    ovpn_path = tmp_path / "configs" / "test.ovpn"
+    ovpn_path.parent.mkdir(parents=True, exist_ok=True)
+    ovpn_path.write_text(ovpn_content, encoding="utf-8")
+
+    parsed = manager.parse_openvpn_conf(ovpn_path)
+
+    assert parsed["ovpn_dev"] == "tun"
+    assert parsed["ovpn_proto"] == "udp"
+    assert parsed["ovpn_remote"] == "vpn.example.com"
+    assert parsed["ovpn_port"] == "1194"
+    assert parsed["ovpn_cipher"] == "AES-256-GCM"
+    assert parsed["ovpn_auth"] == "SHA256"
+    assert "BEGIN CERTIFICATE" in parsed.get("ovpn_ca", "")
+    assert "remote-cert-tls server" in parsed.get("ovpn_extra", "")

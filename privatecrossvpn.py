@@ -463,6 +463,162 @@ class ProfileManager:
         logger.info("OpenVPN config generated: %s", conf_path)
         return conf_path
 
+    def parse_wireguard_conf(self, conf_path: Path) -> dict[str, Any]:
+        """Parse a WireGuard .conf file and return a dict with field values."""
+        data: dict[str, Any] = {}
+        if not conf_path.exists():
+            return data
+
+        try:
+            content = conf_path.read_text(encoding="utf-8")
+            current_section = None
+
+            for line in content.splitlines():
+                line = line.strip()
+                # Skip empty lines and comments
+                if not line or line.startswith("#"):
+                    continue
+
+                # Section headers
+                if line.startswith("["):
+                    current_section = line.lower()
+                    continue
+
+                # Key=value parsing
+                if "=" in line:
+                    key, _, value = line.partition("=")
+                    key = key.strip().lower()
+                    value = value.strip()
+
+                    if current_section == "[interface]":
+                        if key == "privatekey":
+                            data["wg_private_key"] = value
+                        elif key == "address":
+                            data["wg_address"] = value
+                        elif key == "dns":
+                            data["wg_dns"] = value
+                        elif key == "listenport":
+                            data["wg_listen_port"] = value
+
+                    elif current_section == "[peer]":
+                        if key == "publickey":
+                            data["wg_public_key"] = value
+                        elif key == "presharedkey":
+                            data["wg_preshared_key"] = value
+                        elif key == "endpoint":
+                            data["wg_endpoint"] = value
+                        elif key == "allowedips":
+                            data["wg_allowed_ips"] = value
+                        elif key == "persistentkeepalive":
+                            data["wg_keepalive"] = value
+
+        except Exception as exc:
+            logger.error("Failed to parse WireGuard config %s: %s", conf_path, exc)
+
+        return data
+
+    def parse_openvpn_conf(self, conf_path: Path) -> dict[str, Any]:
+        """Parse an OpenVPN .ovpn file and return a dict with field values."""
+        data: dict[str, Any] = {}
+        if not conf_path.exists():
+            return data
+
+        try:
+            content = conf_path.read_text(encoding="utf-8")
+            lines = content.splitlines()
+            extra_lines: list[str] = []
+            current_inline_block = None
+            inline_content: list[str] = []
+
+            i = 0
+            while i < len(lines):
+                line = lines[i].strip()
+                i += 1
+
+                # Skip empty lines and comments
+                if not line or line.startswith("#"):
+                    continue
+
+                # Inline certificate/key blocks
+                if line.startswith("<") and line.endswith(">"):
+                    tag = line[1:-1]
+                    if tag in ("ca", "cert", "key", "tls-auth"):
+                        current_inline_block = tag
+                        inline_content = []
+                        continue
+
+                if current_inline_block and line.startswith("</"):
+                    tag = line[2:-1]
+                    if tag == current_inline_block:
+                        cert_content = "\n".join(inline_content).strip()
+                        if current_inline_block == "ca":
+                            data["ovpn_ca"] = cert_content
+                        elif current_inline_block == "cert":
+                            data["ovpn_cert"] = cert_content
+                        elif current_inline_block == "key":
+                            data["ovpn_key"] = cert_content
+                        elif current_inline_block == "tls-auth":
+                            data["ovpn_tls_auth"] = cert_content
+                        current_inline_block = None
+                    continue
+
+                # Collect lines within inline blocks
+                if current_inline_block:
+                    inline_content.append(line)
+                    continue
+
+                # Parse directives
+                if " " in line:
+                    parts = line.split(None, 1)
+                    key = parts[0]
+                    value = parts[1] if len(parts) > 1 else ""
+
+                    if key == "dev":
+                        data["ovpn_dev"] = value
+                    elif key == "proto":
+                        data["ovpn_proto"] = value
+                    elif key == "remote":
+                        # remote host port [proto]
+                        remote_parts = value.split()
+                        if len(remote_parts) >= 1:
+                            data["ovpn_remote"] = remote_parts[0]
+                        if len(remote_parts) >= 2:
+                            data["ovpn_port"] = remote_parts[1]
+                    elif key == "cipher":
+                        data["ovpn_cipher"] = value
+                    elif key == "auth":
+                        data["ovpn_auth"] = value
+                    elif key not in (
+                        "client",
+                        "resolv-retry",
+                        "nobind",
+                        "persist-key",
+                        "persist-tun",
+                        "verb",
+                    ):
+                        # Collect unrecognized directives as extra
+                        extra_lines.append(line)
+                else:
+                    # Single keyword lines like "client", "nobind"
+                    if line not in (
+                        "client",
+                        "resolv-retry",
+                        "nobind",
+                        "persist-key",
+                        "persist-tun",
+                        "verb",
+                        "3",
+                    ):
+                        extra_lines.append(line)
+
+            if extra_lines:
+                data["ovpn_extra"] = "\n".join(extra_lines)
+
+        except Exception as exc:
+            logger.error("Failed to parse OpenVPN config %s: %s", conf_path, exc)
+
+        return data
+
 
 # ---------------------------------------------------------------------------
 # Logging — thread-safe queue-based handler that feeds into the UI
@@ -1519,11 +1675,17 @@ class PrivateCrossVPNApp(ctk.CTk):
         )
         self._import_btn.grid(row=6, column=0, padx=20, pady=(4, 4), sticky="ew")
 
+        # --- Export to file ---
+        self._export_btn = ctk.CTkButton(
+            sb, text="Export Profile…", command=self._export_profile
+        )
+        self._export_btn.grid(row=7, column=0, padx=20, pady=(4, 4), sticky="ew")
+
         # Kill-switch
         self._kill_switch_check = ctk.CTkCheckBox(
             sb, text="Kill-Switch", variable=self._kill_switch_var
         )
-        self._kill_switch_check.grid(row=7, column=0, padx=20, pady=(12, 4), sticky="w")
+        self._kill_switch_check.grid(row=8, column=0, padx=20, pady=(12, 4), sticky="w")
 
         # Connect / Disconnect
         self._connect_btn = ctk.CTkButton(
@@ -3314,9 +3476,23 @@ class PrivateCrossVPNApp(ctk.CTk):
         # Auto-create a profile for it
         name = src.stem
         if proto == Protocol.WIREGUARD:
-            data = {"protocol": proto.value, "name": name, "config_file": str(dest)}
+            data: dict[str, Any] = {
+                "protocol": proto.value,
+                "name": name,
+                "config_file": str(dest),
+            }
+            # Parse .conf file and merge parsed fields
+            parsed = self.profile_mgr.parse_wireguard_conf(dest)
+            data.update(parsed)
         elif proto == Protocol.OPENVPN:
-            data = {"protocol": proto.value, "name": name, "config_file": str(dest)}
+            data = {
+                "protocol": proto.value,
+                "name": name,
+                "config_file": str(dest),
+            }
+            # Parse .ovpn file and merge parsed fields
+            parsed = self.profile_mgr.parse_openvpn_conf(dest)
+            data.update(parsed)
         else:
             # SSH — import key
             self._ssh_key_path = dest
@@ -3327,6 +3503,8 @@ class PrivateCrossVPNApp(ctk.CTk):
         self.settings.last_profile = name
         self._load_profile_list()
         self._profile_var.set(name)
+        # Populate editor fields with imported data
+        self._on_profile_select(name)
 
     def _import_ssh_key(self) -> None:
         path = filedialog.askopenfilename(
@@ -3347,6 +3525,109 @@ class PrivateCrossVPNApp(ctk.CTk):
             self._configs_dir_label.configure(text=d)
             self._load_profile_list()
             logger.info("Configs directory changed to: %s", d)
+
+    def _export_profile(self) -> None:
+        """Export current profile to .conf, .ovpn, or .json format."""
+        name = self._profile_var.get()
+        if name == "(new profile)":
+            messagebox.showerror("Error", "Select or create a profile first.")
+            return
+
+        data = self.profile_mgr.load_profile(name)
+        if not data:
+            messagebox.showerror("Error", "Could not load profile.")
+            return
+
+        proto = data.get("protocol", "WireGuard")
+
+        # Ask user which format to export
+        export_format = self._ask_export_format(proto)
+        if not export_format:
+            return
+
+        # Determine file extension and generate content
+        if export_format == "conf" and proto == Protocol.WIREGUARD.value:
+            filetypes = [("WireGuard Config", "*.conf"), ("All Files", "*.*")]
+            default_ext = ".conf"
+        elif export_format == "ovpn" and proto == Protocol.OPENVPN.value:
+            filetypes = [("OpenVPN Config", "*.ovpn"), ("All Files", "*.*")]
+            default_ext = ".ovpn"
+        else:
+            # JSON format works for all
+            filetypes = [("JSON Profile", "*.json"), ("All Files", "*.*")]
+            default_ext = ".json"
+
+        # Open save dialog
+        initial_file = f"{name}{default_ext}"
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=default_ext,
+            initialfile=initial_file,
+            filetypes=filetypes,
+        )
+
+        if not file_path:
+            return
+
+        try:
+            if export_format == "conf" and proto == Protocol.WIREGUARD.value:
+                # Generate .conf from profile fields
+                dest_path = self.profile_mgr.generate_wireguard_conf(name, data)
+                shutil.copy2(dest_path, file_path)
+                messagebox.showinfo("Success", f"Profile exported to:\n{file_path}")
+            elif export_format == "ovpn" and proto == Protocol.OPENVPN.value:
+                # Generate .ovpn from profile fields
+                dest_path = self.profile_mgr.generate_openvpn_conf(name, data)
+                shutil.copy2(dest_path, file_path)
+                messagebox.showinfo("Success", f"Profile exported to:\n{file_path}")
+            else:
+                # Export as JSON
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2)
+                messagebox.showinfo("Success", f"Profile exported to:\n{file_path}")
+
+            logger.info("Profile '%s' exported to %s", name, file_path)
+        except Exception as exc:
+            logger.error("Export failed: %s", exc)
+            messagebox.showerror("Export Error", f"Failed to export profile:\n{exc}")
+
+    def _ask_export_format(self, proto: str) -> Optional[str]:
+        """Ask user which format to export the profile."""
+        if proto == Protocol.WIREGUARD.value:
+            formats = ["WireGuard .conf", "JSON backup", "Cancel"]
+            buttons = {"WireGuard .conf": "conf", "JSON backup": "json"}
+        elif proto == Protocol.OPENVPN.value:
+            formats = ["OpenVPN .ovpn", "JSON backup", "Cancel"]
+            buttons = {"OpenVPN .ovpn": "ovpn", "JSON backup": "json"}
+        else:
+            # SSH only supports JSON
+            return "json"
+
+        # Create a simple dialog for format selection
+        window = ctk.CTkToplevel(self)
+        window.title("Export Format")
+        window.geometry("300x150")
+        window.resizable(False, False)
+
+        label = ctk.CTkLabel(window, text="Choose export format:")
+        label.pack(pady=10)
+
+        result: dict[str, Optional[str]] = {"format": None}
+
+        def select_format(fmt: str) -> None:
+            result["format"] = buttons.get(fmt)
+            window.destroy()
+
+        for fmt in formats:
+            btn = ctk.CTkButton(
+                window, text=fmt, command=lambda f=fmt: select_format(f)
+            )
+            btn.pack(pady=5, padx=20, fill="x")
+
+        window.transient(self)
+        window.grab_set()
+        self.wait_window(window)
+
+        return result["format"]
 
     # -----------------------------------------------------------------------
     # Connect / Disconnect
