@@ -1,12 +1,13 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/models/connection_profile.dart';
 import '../../core/models/ip_info.dart';
-import '../../core/services/vpn_service.dart';
-import '../../core/services/profile_manager.dart';
 import '../../core/services/ip_info_service.dart';
+import '../../core/services/profile_manager.dart';
 import '../../core/services/reconnect_manager.dart';
+import '../../core/services/vpn_service.dart';
 
 // ---------------------------------------------------------------------------
 // Providers
@@ -36,6 +37,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   late final ReconnectManager _reconnect;
+  static const _locationRefreshAttempts = 8;
 
   @override
   void initState() {
@@ -67,12 +69,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     final profile = await ProfileManager.instance.loadProfile(profileName);
-    if (profile == null) return;
+    if (profile == null) {
+      return;
+    }
 
     try {
+      final oldIp = (await IpInfoService.instance.fetch())?.ip;
       await vpn.connect(profile);
       _reconnect.start();
-      ref.invalidate(ipInfoProvider);
+      await _refreshConnectedLocation(oldIp);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -80,6 +85,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
       }
     }
+  }
+
+  Future<void> _refreshConnectedLocation(String? previousIp) async {
+    for (int attempt = 0; attempt < _locationRefreshAttempts; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      final refreshed = await ref.refresh(ipInfoProvider.future);
+      if (refreshed == null) {
+        continue;
+      }
+      if (previousIp == null || refreshed.ip != previousIp) {
+        return;
+      }
+    }
+  }
+
+  Future<void> _importProfile() async {
+    final picked = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      type: FileType.custom,
+      allowedExtensions: ['conf', 'json'],
+    );
+
+    final path = picked?.files.single.path;
+    if (path == null || path.isEmpty) {
+      return;
+    }
+
+    final imported = await ProfileManager.instance.importFromFile(path);
+    if (!mounted) {
+      return;
+    }
+
+    if (imported == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile import failed')),
+      );
+      return;
+    }
+
+    ref.read(selectedProfileProvider.notifier).state = imported.name;
+    ref.invalidate(profilesProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Imported profile: ${imported.name}')),
+    );
   }
 
   @override
@@ -108,7 +159,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Status card
             Card(
               color: isConnected ? Colors.green[800] : Colors.grey[850],
               child: Padding(
@@ -140,20 +190,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ? Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('IP: ${info.ip}',
-                                      style: const TextStyle(
-                                          color: Colors.white70)),
-                                  Text('Location: ${info.location}',
-                                      style: const TextStyle(
-                                          color: Colors.white70)),
-                                  Text('ISP: ${info.org}',
-                                      style: const TextStyle(
-                                          color: Colors.white70)),
+                                  Text(
+                                    'IP: ${info.ip}',
+                                    style:
+                                        const TextStyle(color: Colors.white70),
+                                  ),
+                                  Text(
+                                    'Location: ${info.location}',
+                                    style:
+                                        const TextStyle(color: Colors.white70),
+                                  ),
+                                  Text(
+                                    'ISP: ${info.org}',
+                                    style:
+                                        const TextStyle(color: Colors.white70),
+                                  ),
                                 ],
                               )
                             : const SizedBox(),
                         loading: () => const CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2),
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                         error: (_, __) => const SizedBox(),
                       ),
                       _UptimeWidget(
@@ -163,32 +221,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // Profile selector
             profiles.when(
-              data: (list) => DropdownButtonFormField<String>(
-                // ignore: deprecated_member_use
-                value: selected,
-                decoration: const InputDecoration(
-                  labelText: 'Profile',
-                  border: OutlineInputBorder(),
-                ),
-                items: list
-                    .map((n) => DropdownMenuItem(value: n, child: Text(n)))
-                    .toList(),
-                onChanged: isConnected
-                    ? null
-                    : (v) =>
-                        ref.read(selectedProfileProvider.notifier).state = v,
-              ),
+              data: (list) {
+                final current = list.contains(selected) ? selected : null;
+                if (current != selected) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    ref.read(selectedProfileProvider.notifier).state = null;
+                  });
+                }
+
+                return DropdownButtonFormField<String>(
+                  // ignore: deprecated_member_use
+                  value: current,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Profile',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: list
+                      .map((n) => DropdownMenuItem(value: n, child: Text(n)))
+                      .toList(),
+                  onChanged: isConnected
+                      ? null
+                      : (v) =>
+                          ref.read(selectedProfileProvider.notifier).state = v,
+                );
+              },
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('Error: $e'),
             ),
-
             const SizedBox(height: 8),
-
             Row(
               children: [
                 Expanded(
@@ -201,8 +264,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     },
                   ),
                 ),
-                if (selected != null) ...[
-                  const SizedBox(width: 8),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Import .conf'),
+                    onPressed: isConnected ? null : _importProfile,
+                  ),
+                ),
+              ],
+            ),
+            if (selected != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
                   IconButton(
                     icon: const Icon(Icons.edit),
                     onPressed: isConnected
@@ -228,12 +304,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           },
                   ),
                 ],
-              ],
-            ),
-
+              ),
+            ],
             const Spacer(),
-
-            // Connect / Disconnect button
             FilledButton(
               onPressed: isConnecting ? null : _toggleConnection,
               style: FilledButton.styleFrom(
@@ -245,7 +318,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       height: 20,
                       width: 20,
                       child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2),
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
                   : Text(
                       isConnected ? 'Disconnect' : 'Connect',
@@ -266,12 +341,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             content: Text('Delete "$name"?'),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel')),
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
               TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Delete',
-                      style: TextStyle(color: Colors.red))),
+                onPressed: () => Navigator.pop(context, true),
+                child:
+                    const Text('Delete', style: TextStyle(color: Colors.red)),
+              ),
             ],
           ),
         ) ??
@@ -294,7 +371,9 @@ class _UptimeWidgetState extends State<_UptimeWidget> {
   void initState() {
     super.initState();
     _stream = Stream.periodic(const Duration(seconds: 1), (_) {
-      if (widget.connectedAt == null) return '00:00:00';
+      if (widget.connectedAt == null) {
+        return '00:00:00';
+      }
       final diff = DateTime.now().difference(widget.connectedAt!);
       final h = diff.inHours.toString().padLeft(2, '0');
       final m = (diff.inMinutes % 60).toString().padLeft(2, '0');

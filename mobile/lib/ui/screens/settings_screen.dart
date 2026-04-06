@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/vpn_service.dart';
 
@@ -11,11 +12,21 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _killSwitch = false;
+  String _version = '-';
 
   @override
   void initState() {
     super.initState();
     _killSwitch = VpnService.instance.killSwitch;
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (!mounted) {
+      return;
+    }
+    setState(() => _version = '${info.version}+${info.buildNumber}');
   }
 
   @override
@@ -37,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const Divider(),
             ListTile(
               title: const Text('Version'),
-              trailing: const Text('1.2.2'),
+              trailing: Text(_version),
             ),
           ],
         ),
