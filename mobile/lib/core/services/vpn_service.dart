@@ -37,6 +37,9 @@ class VpnService {
       return;
     }
 
+    // Ensure no stale backend tunnel remains before starting a new one.
+    await _stopAllBackends();
+
     final validationError = profile.validate();
     if (validationError != null) {
       _setState(TunnelState.error);
@@ -78,25 +81,61 @@ class VpnService {
   }
 
   Future<void> disconnect() async {
-    if (_state == TunnelState.disconnected) return;
+    if (_state == TunnelState.disconnected && _activeProfile == null) {
+      return;
+    }
     _setState(TunnelState.disconnecting);
     try {
-      switch (_activeProfile) {
-        case WireGuardProfile _:
-          await _wg.stopVpn();
-        case OpenVPNProfile _:
-          _ovpn?.disconnect();
-          _ovpn = null;
-        case SSHProfile _:
-          await _sshHandle?.close();
-          _sshHandle = null;
-        case null:
-          break;
-      }
+      await _stopAllBackends();
     } finally {
       _activeProfile = null;
       _connectedAt = null;
       _setState(TunnelState.disconnected);
+    }
+  }
+
+  Future<void> _stopAllBackends() async {
+    await _safeStopWireGuard();
+    await _safeStopOpenVpn();
+    await _safeStopSsh();
+  }
+
+  Future<void> _safeStopWireGuard() async {
+    try {
+      await _wg.stopVpn();
+      // Some devices/plugins need a second stop call to fully tear down.
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      await _wg.stopVpn();
+    } catch (_) {
+      // Ignore plugin-specific stop errors and continue teardown.
+    }
+  }
+
+  Future<void> _safeStopOpenVpn() async {
+    final ovpn = _ovpn;
+    _ovpn = null;
+    if (ovpn == null) {
+      return;
+    }
+
+    try {
+      ovpn.disconnect();
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    } catch (_) {
+      // Ignore plugin-specific stop errors and continue teardown.
+    }
+  }
+
+  Future<void> _safeStopSsh() async {
+    final handle = _sshHandle;
+    _sshHandle = null;
+    if (handle == null) {
+      return;
+    }
+    try {
+      await handle.close();
+    } catch (_) {
+      // Ignore close errors and continue teardown.
     }
   }
 

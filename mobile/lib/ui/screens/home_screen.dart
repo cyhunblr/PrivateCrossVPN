@@ -23,7 +23,7 @@ final vpnStateProvider = StreamProvider<TunnelState>(
 );
 
 final ipInfoProvider = FutureProvider<IpInfo?>(
-  (_) => IpInfoService.instance.fetch(),
+  (_) => IpInfoService.instance.fetch(forceRefresh: true),
 );
 
 // ---------------------------------------------------------------------------
@@ -56,6 +56,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (vpn.state == TunnelState.connected) {
       _reconnect.stop();
       await vpn.disconnect();
+      IpInfoService.instance.clearCache();
       ref.invalidate(ipInfoProvider);
       return;
     }
@@ -92,14 +93,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (attempt > 0) {
         await Future<void>.delayed(const Duration(seconds: 1));
       }
-      final refreshed = await ref.refresh(ipInfoProvider.future);
+      final refreshed = await IpInfoService.instance.fetch(forceRefresh: true);
       if (refreshed == null) {
         continue;
       }
       if (previousIp == null || refreshed.ip != previousIp) {
+        ref.invalidate(ipInfoProvider);
         return;
       }
     }
+
+    // Even if IP did not change, refresh UI with the latest available info.
+    ref.invalidate(ipInfoProvider);
+  }
+
+  String? _activeRemoteServer() {
+    final profile = VpnService.instance.activeProfile;
+    if (profile == null) {
+      return null;
+    }
+    if (profile is WireGuardProfile) {
+      return profile.endpoint;
+    }
+    if (profile is OpenVPNProfile) {
+      return '${profile.remote}:${profile.port}';
+    }
+    if (profile is SSHProfile) {
+      return '${profile.host}:${profile.port}';
+    }
+    return null;
   }
 
   Future<void> _importProfile() async {
@@ -143,6 +165,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isConnected = vpnState.valueOrNull == TunnelState.connected;
     final isConnecting = vpnState.valueOrNull == TunnelState.connecting ||
         vpnState.valueOrNull == TunnelState.disconnecting;
+    final remoteServer = _activeRemoteServer();
 
     return Scaffold(
       appBar: AppBar(
@@ -185,6 +208,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     if (isConnected) ...[
                       const SizedBox(height: 8),
+                      if (remoteServer != null && remoteServer.isNotEmpty)
+                        Text(
+                          'Remote Server: $remoteServer',
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      if (remoteServer != null && remoteServer.isNotEmpty)
+                        const SizedBox(height: 4),
                       ipInfo.when(
                         data: (info) => info != null
                             ? Column(
