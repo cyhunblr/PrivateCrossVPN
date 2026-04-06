@@ -15,7 +15,10 @@ class VpnService {
   TunnelState get state => _state;
 
   final _stateController = StreamController<TunnelState>.broadcast();
-  Stream<TunnelState> get stateStream => _stateController.stream;
+  Stream<TunnelState> get stateStream async* {
+    yield _state;
+    yield* _stateController.stream;
+  }
 
   ConnectionProfile? _activeProfile;
   ConnectionProfile? get activeProfile => _activeProfile;
@@ -92,6 +95,15 @@ class VpnService {
       _connectedAt = null;
       _setState(TunnelState.disconnected);
     }
+  }
+
+  void restoreConnectedSession(
+    ConnectionProfile profile, {
+    DateTime? connectedAt,
+  }) {
+    _activeProfile = profile;
+    _connectedAt = connectedAt ?? DateTime.now();
+    _setState(TunnelState.connected);
   }
 
   Future<void> _stopAllBackends() async {

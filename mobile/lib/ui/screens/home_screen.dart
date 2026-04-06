@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/models/connection_profile.dart';
 import '../../core/models/ip_info.dart';
 import '../../core/services/ip_info_service.dart';
@@ -36,6 +37,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const _prefSelectedProfile = 'mobile_selected_profile';
+  static const _prefSessionActive = 'mobile_session_active';
+  static const _prefSessionProfile = 'mobile_session_profile';
+  static const _prefSessionConnectedAt = 'mobile_session_connected_at';
+
   late final ReconnectManager _reconnect;
   static const _locationRefreshAttempts = 8;
   String? _preConnectIp;
@@ -46,6 +52,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _reconnect = ReconnectManager(VpnService.instance);
+    Future<void>.microtask(_restoreAppState);
   }
 
   @override
@@ -59,6 +66,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (vpn.state == TunnelState.connected) {
       _reconnect.stop();
       await vpn.disconnect();
+      await _clearPersistedSession();
       IpInfoService.instance.clearCache();
       if (mounted) {
         setState(() {
@@ -85,6 +93,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     try {
+      await _persistSelectedProfile(profileName);
       final oldIp = (await IpInfoService.instance.fetch())?.ip;
       if (mounted) {
         setState(() {
@@ -94,6 +103,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         });
       }
       await vpn.connect(profile);
+      await _persistActiveSession(profile);
       _reconnect.start();
       await _refreshConnectedLocation(oldIp);
     } catch (e) {
@@ -199,7 +209,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     ref.read(selectedProfileProvider.notifier).state = imported.name;
+    await _persistSelectedProfile(imported.name);
     ref.invalidate(profilesProvider);
+    if (!mounted) {
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Imported profile: ${imported.name}')),
     );
@@ -328,8 +342,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       .toList(),
                   onChanged: isConnected
                       ? null
-                      : (v) =>
-                          ref.read(selectedProfileProvider.notifier).state = v,
+                      : (v) {
+                          ref.read(selectedProfileProvider.notifier).state = v;
+                          _persistSelectedProfile(v);
+                        },
                 );
               },
               loading: () => const LinearProgressIndicator(),
@@ -383,6 +399,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   .deleteProfile(selected);
                               ref.read(selectedProfileProvider.notifier).state =
                                   null;
+                              await _persistSelectedProfile(null);
                               ref.invalidate(profilesProvider);
                             }
                           },
@@ -437,6 +454,70 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ) ??
         false;
+  }
+
+  Future<void> _restoreAppState() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final selected = prefs.getString(_prefSelectedProfile);
+    if (selected != null && selected.isNotEmpty) {
+      final selectedProfile =
+          await ProfileManager.instance.loadProfile(selected);
+      if (selectedProfile != null) {
+        ref.read(selectedProfileProvider.notifier).state = selected;
+      }
+    }
+
+    final sessionActive = prefs.getBool(_prefSessionActive) ?? false;
+    final sessionProfileName = prefs.getString(_prefSessionProfile);
+    if (!sessionActive ||
+        sessionProfileName == null ||
+        sessionProfileName.isEmpty) {
+      return;
+    }
+
+    final profile =
+        await ProfileManager.instance.loadProfile(sessionProfileName);
+    if (profile == null) {
+      await _clearPersistedSession();
+      return;
+    }
+
+    final connectedAtRaw = prefs.getString(_prefSessionConnectedAt);
+    final connectedAt =
+        connectedAtRaw != null ? DateTime.tryParse(connectedAtRaw) : null;
+
+    VpnService.instance
+        .restoreConnectedSession(profile, connectedAt: connectedAt);
+    _reconnect.start();
+
+    ref.read(selectedProfileProvider.notifier).state = sessionProfileName;
+    await _persistSelectedProfile(sessionProfileName);
+  }
+
+  Future<void> _persistSelectedProfile(String? name) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (name == null || name.isEmpty) {
+      await prefs.remove(_prefSelectedProfile);
+    } else {
+      await prefs.setString(_prefSelectedProfile, name);
+    }
+  }
+
+  Future<void> _persistActiveSession(ConnectionProfile profile) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefSessionActive, true);
+    await prefs.setString(_prefSessionProfile, profile.name);
+    final connectedAt = VpnService.instance.connectedAt ?? DateTime.now();
+    await prefs.setString(
+        _prefSessionConnectedAt, connectedAt.toIso8601String());
+  }
+
+  Future<void> _clearPersistedSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_prefSessionActive);
+    await prefs.remove(_prefSessionProfile);
+    await prefs.remove(_prefSessionConnectedAt);
   }
 }
 
